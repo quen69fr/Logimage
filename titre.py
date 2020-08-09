@@ -1,19 +1,42 @@
 # coding: utf-8
 
 from affichage import *
+import os
 
 
 class Titre:
-    def __init__(self):
-        self.texte = DEFAULT_TITRE
+    def __init__(self, titre: str = None, titre_sauvegarde: str = None):
+        self.texte = DEFAULT_TITRE if titre is None else titre
         self.ecran = None
         self.x = 0
         self.y = 0
         self.largeur = 0
         self.hauteur = 0
 
+        self.titre_sauvegarde = titre_sauvegarde
+        if self.titre_sauvegarde is None:
+            self.update_titre_sauvegarde()
+
         self.selectinne = False
         self.update_ecran()
+
+    def update_titre_sauvegarde(self):
+        titre_sauvegarde = self.texte
+        for caractere_special in "§!@#$%^&*()[]{};:,./<>\?|²¨`'°~-=_+" + '"':
+            titre_sauvegarde = titre_sauvegarde.replace(caractere_special, '')
+        for i, lette in enumerate(titre_sauvegarde):
+            if lette == ' ':
+                if i + 1 < len(titre_sauvegarde):
+                    titre_sauvegarde = titre_sauvegarde[:i + 1] + \
+                                       titre_sauvegarde[i + 1].upper() + \
+                                       titre_sauvegarde[i + 2:]
+        titre_sauvegarde = titre_sauvegarde.replace(' ', '')
+        titre_sauvegarde2 = titre_sauvegarde + '.json'
+        n = 0
+        while titre_sauvegarde2 in os.listdir(NOM_DOSSIER_SAUVEGARDE):
+            n += 1
+            titre_sauvegarde2 = titre_sauvegarde + str(n) + '.json'
+        self.titre_sauvegarde = titre_sauvegarde2
 
     def update_ecran(self):
         surface = affiche_texte(self.texte, 0, 0, None, taille=TAILLE_TITRE, couleur=COULEUR_TITRE)
@@ -37,9 +60,11 @@ class Titre:
             self.selectinne = True
             self.new_texte('')
         else:
-            if len(self.texte) == 0:
-                self.new_texte(DEFAULT_TITRE)
-            self.selectinne = False
+            if self.selectinne:
+                if len(self.texte) == 0:
+                    self.new_texte(DEFAULT_TITRE)
+                self.selectinne = False
+                self.update_titre_sauvegarde()
 
     def gere_clavier(self, event):
         if self.selectinne:
@@ -47,6 +72,7 @@ class Titre:
                 if len(self.texte) == 0:
                     self.new_texte(DEFAULT_TITRE)
                 self.selectinne = False
+                self.update_titre_sauvegarde()
             elif event.key == pygame.K_BACKSPACE:
                 self.new_texte(self.texte[:-1])
             else:
