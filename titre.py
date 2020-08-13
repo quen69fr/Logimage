@@ -22,8 +22,10 @@ class Titre:
 
     def update_titre_sauvegarde(self):
         titre_sauvegarde = self.texte
-        for caractere_special in "§!@#$%^&*()[]{};:,./<>\?|²¨`'°~-=_+" + '"':
-            titre_sauvegarde = titre_sauvegarde.replace(caractere_special, '')
+        for lettres_sepeciale, lettre in [("§!@#$%^&*()[]{};:,./<>\?|²¨`'°~-=_+" + '"', ""), ("ç", "c"), ("ñ", "n"),
+                                          ("àâä", "a"), ("éêèë", "e"),  ("îï", "i"), ("ôö", "o"), ("ùûü", "u")]:
+            for lettre_speciale in lettres_sepeciale:
+                titre_sauvegarde = titre_sauvegarde.replace(lettre_speciale, lettre)
         for i, lette in enumerate(titre_sauvegarde):
             if lette == ' ':
                 if i + 1 < len(titre_sauvegarde):

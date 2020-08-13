@@ -4,6 +4,7 @@ from logimage import *
 
 
 def creer_logimage_a_partir_png(chemin_image: str, titre: str, save_erreur=False):
+    # Images : https://fr.goobix.com/jeux-en-ligne/nonograms/?s=-
     image = pygame.image.load(chemin_image)
     largeur, hauteur = image.get_size()
     logimage = create_logimage_nouveau(MODE_LOGIMAGE_CREER, (largeur, hauteur), titre)
@@ -35,7 +36,7 @@ def creer_logimage_a_partir_png(chemin_image: str, titre: str, save_erreur=False
 
 
 def impr_dic_logimage_logimage_sequences(chemin_image: str, titre: str):
-    # http://a.teall.info/nonogram/
+    # Correcteur : http://a.teall.info/nonogram/
     image = pygame.image.load(chemin_image)
     largeur, hauteur = image.get_size()
     logimage = create_logimage_nouveau(MODE_LOGIMAGE_CREER, (largeur, hauteur), titre)
