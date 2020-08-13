@@ -888,8 +888,8 @@ class Logimage:
                 self.gere_clic_down_sequences_colonnes_mode_rentre(j, num, sens)
 
         if self.mode_logimage == MODE_LOGIMAGE_FAIT:
-            if self.nb_lignes > i >= 0 > j >= - self.nb_colonnes_sequences_ligne or \
-                    - self.nb_colonnes > j >= 0 > i >= - self.nb_lignes_sequences_colonne:
+            if self.nb_lignes > i >= 0 > j >= - len(self.sequences_lignes[i]) or \
+                    self.nb_colonnes > j >= 0 > i >= - len(self.sequences_colonnes[j]):
                 if (i, j) in self.liste_cases_rayees:
                     self.liste_cases_rayees.remove((i, j))
                 else:
@@ -1161,6 +1161,13 @@ class Logimage:
                                             self.y_ecran + y + demi_cote_case),
                                            self.taille_point_crayon)
 
+            for i, j in self.liste_cases_rayees:
+                x, y = self.get_pos_case(i, j)
+                affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y,
+                                          self.cote_case - self.taille_quadrillage,
+                                          self.cote_case - self.taille_quadrillage),
+                                         screen, NOIR, 150)
+
         if action_pointeur_:
             ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
             if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
@@ -1171,13 +1178,6 @@ class Logimage:
                                          screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
                 affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote, self.hauteur_ecran - 2 * d),
                                          screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
-
-            for i, j in self.liste_cases_rayees:
-                x, y = self.get_pos_case(i, j)
-                affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y,
-                                          self.cote_case - self.taille_quadrillage,
-                                          self.cote_case - self.taille_quadrillage),
-                                         screen, NOIR, 150)
 
     def affiche(self, screen: pygame.Surface):
         self.update_affichage()
