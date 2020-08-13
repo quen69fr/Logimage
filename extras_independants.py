@@ -3,7 +3,7 @@
 from logimage import *
 
 
-def creer_logimage_a_partir_png(chemin_image: str, titre: str):
+def creer_logimage_a_partir_png(chemin_image: str, titre: str, save_erreur=False):
     image = pygame.image.load(chemin_image)
     largeur, hauteur = image.get_size()
     logimage = create_logimage_nouveau(MODE_LOGIMAGE_CREER, (largeur, hauteur), titre)
@@ -11,48 +11,110 @@ def creer_logimage_a_partir_png(chemin_image: str, titre: str):
         for colonne in range(largeur):
             if image.get_at((colonne, ligne)) == NOIR:
                 logimage.set_case_grille(ligne, colonne, True)
-    logimage.sauvegarde_logimage()
-
-
-def creer_logimage_a_partir_txt(chemin_texte: str, titre: str):
-    liste_nbs_colonnes = []
-    liste_nbs_lignes = []
-    mode = 0
-    with open(chemin_texte) as texte:
-        for ligne in texte:
-            if mode == 0:
-                if 'columns' in ligne:
-                    mode = 1
-                    continue
-            elif mode == 1:
-                if 'rows' in ligne:
-                    mode = 2
-                    continue
-                if len(ligne) > 1:
-                    colonne_nbs = []
-                    for lettre in ligne.split(' '):
-                        if len(lettre) > 0:
-                            colonne_nbs.append(int(lettre))
-                    liste_nbs_colonnes.append(colonne_nbs)
+    if logimage.teste_coherence_sequences:
+        if logimage.sauvegarde_logimage('Entrees/ImagesReussies/'):
+            if logimage.possible:
+                if logimage.faisable:
+                    print(f'{titre} --> FAISABLE : {logimage.titre.titre_sauvegarde} !')
+                else:
+                    print(f'{titre} --> INFAISABLE : {logimage.titre.titre_sauvegarde}')
             else:
-                if len(ligne) > 1:
-                    ligne_nbs = []
-                    for lettre in ligne.split(' '):
-                        if len(lettre) > 0:
-                            ligne_nbs.append(int(lettre))
-                    liste_nbs_lignes.append(ligne_nbs)
+                print(f'{titre} --> INCOHERENT --> Théoriquement impossible !!')
+            return True
+        else:
+            if save_erreur:
+                pygame.image.save(image, f'Entrees/ImagesPasReussies/{logimage.titre.titre_sauvegarde[:-5]}.png')
+                print(f'{titre} --> ECHEC : {logimage.titre.titre_sauvegarde[:-5]}.png (saved)')
+            else:
+                print(f'{titre} --> ECHEC : {logimage.titre.titre_sauvegarde[:-5]}.png (not saved)')
+            return False
+    else:
+        pygame.image.save(image, f'Entrees/ImagesIncohérentes/{logimage.titre.titre_sauvegarde[:-5]}.png')
+        print(f'{titre} --> INCOHERENT : {logimage.titre.titre_sauvegarde[:-5]}.png (saved)')
+        return True
 
-    largeur, hauteur = len(liste_nbs_colonnes), len(liste_nbs_lignes)
-    logimage = create_logimage_nouveau(MODE_LOGIMAGE_RENTRE, (largeur, hauteur), titre)
-    for i, ligne in enumerate(liste_nbs_lignes):
-        for case in ligne:
-            logimage.add_case_sequence_ligne(i, case)
-    for j, colonne in enumerate(liste_nbs_colonnes):
-        for case in colonne:
-            logimage.add_case_sequence_colonne(j, case)
 
-    logimage.sauvegarde_logimage()
+def impr_dic_logimage_logimage_sequences(chemin_image: str, titre: str):
+    # http://a.teall.info/nonogram/
+    image = pygame.image.load(chemin_image)
+    largeur, hauteur = image.get_size()
+    logimage = create_logimage_nouveau(MODE_LOGIMAGE_CREER, (largeur, hauteur), titre)
+    for ligne in range(hauteur):
+        for colonne in range(largeur):
+            if image.get_at((colonne, ligne)) == NOIR:
+                logimage.set_case_grille(ligne, colonne, True)
+    print(str({"ver": logimage.sequences_lignes,
+               "hor": logimage.sequences_colonnes}).replace("'", '"').replace(' ', ''))
 
+
+liste = [('Entrees/Images/AuBordDeLeau.png', "Au bord de l'eau"),
+         ('Entrees/Images/AuReveil.png', 'Au reveil !'),
+         ('Entrees/Images/Baballe.png', 'Baballe'),
+         ('Entrees/Images/BaladeEn.png', 'Balade en ...'),
+         ('Entrees/Images/BallonEnÉquilibre.png', 'Ballon en équilibre'),
+         ('Entrees/Images/Beugleuse.png', 'Beugleuse'),
+         ('Entrees/Images/CélèbrePirate.png', 'Célèbre pirate'),
+         ('Entrees/Images/DansLaPrairie.png', 'Dans la prairie ...'),
+         ('Entrees/Images/DeGarde.png', '... de garde'),
+         ('Entrees/Images/DePirates.png', '... de pirates'),
+         ('Entrees/Images/Donald.png', 'Donald'),
+         ('Entrees/Images/Egypte.png', 'Egypte'),
+         ('Entrees/Images/EnMer1.png', 'En mer'),
+         ('Entrees/Images/EnMontagne.png', 'En montagne'),
+         ('Entrees/Images/EnRoute.png', 'En route !'),
+         ('Entrees/Images/FaireLePlein.png', 'Faire le plein'),
+         ('Entrees/Images/Footing.png', 'Footing ...'),
+         ('Entrees/Images/GrandeAssiette.png', 'Grande assiette'),
+         ('Entrees/Images/GrandRapace.png', 'Grand rapace'),
+         ('Entrees/Images/GrosseCorne.png', 'Grosse corne'),
+         ('Entrees/Images/GrosseVoiture.png', 'Grosse voiture'),
+         ('Entrees/Images/Guerrier.png', 'Guerrier'),
+         ('Entrees/Images/HouHouHooouuuu.png', 'Hou-hou-houuu'),
+         ('Entrees/Images/JeuDe.png', 'Jeu de ...'),
+         ('Entrees/Images/JeuneJoueur.png', 'Jeune joueur'),
+         ('Entrees/Images/JoliesBouclesDoreille.png', "Jolies boucles d'oreille"),
+         ('Entrees/Images/LabourerUnChamp.png', 'Labourer un champ'),
+         ('Entrees/Images/LeCorbeauEtLe.png', 'Le carbeau et le ...'),
+         ('Entrees/Images/LePlusGrandFelin.png', 'Le plus grand félin !'),
+         ('Entrees/Images/Londres.png', 'Londres'),
+         ('Entrees/Images/LumièreDansLocéan.png', "Lumière dans l'océan"),
+         ('Entrees/Images/MoyenAge.png', 'Moyen Age'),
+         ('Entrees/Images/OiseauMajestueux.png', 'Oiseau majestueux'),
+         ('Entrees/Images/Paradisiaque.png', 'Paradisiaque'),
+         ('Entrees/Images/Paysage.png', 'Paysage'),
+         ('Entrees/Images/RoiDeLaSavane.png', 'Roi de la savane'),
+         ('Entrees/Images/SportIndividuel.png', 'Sport individuel'),
+         ('Entrees/Images/SurLaBanquise.png', 'Sur la banquise'),
+         ('Entrees/Images/TasDeBoue.png', 'Tas de boue'),
+         ('Entrees/Images/TournoisDuMoyenAge.png', 'Tournoi au Moyen Age'),
+         ('Entrees/Images/TraverserDeLaManche.png', 'Traversée de la Manche'),
+         ('Entrees/Images/UneÉlectrique.png', 'Une ... élecrtique'),
+         ('Entrees/Images/UnGrandCompagnon.png', 'Un grand compagnon'),
+         ('Entrees/Images/UnNoirEtBlanc.png', 'Noir et blanc'),
+         ('Entrees/Images/UnToutPetit.png', 'Un tout petit ...'),
+         ('Entrees/Images/AuClairDeLune.png', 'Au clair de la Lune'),
+         ('Entrees/Images/Cartes.png', 'Cartes ...'),
+         ('Entrees/Images/EnMilieuUrbain.png', 'En milieu urbain'),
+         ('Entrees/Images/JolieFleure.png', 'Jolie fleure'),
+         ('Entrees/Images/ManifiqueOiseau.png', 'Manifique oiseau'),
+         ('Entrees/Images/OursEnPeluche.png', 'Ours en peluche'),
+         ('Entrees/Images/QuelSon.png', 'Quel son !'),
+         ('Entrees/Images/Sherif.png', 'Shérif'),
+         ('Entrees/Images/SportSurLherbe.png', 'Sport sur herbe'),
+         ('Entrees/Images/UnPeuDambiance.png', "Un peu d'ambiance !"),
+         ('Entrees/Images/UnPeuDePatience.png', 'Un peu de patience')]
+
+# liste = []
+# for chemin in ['Entrees/Images', 'Entrees/Images2']:
+#     for img in os.listdir(chemin):
+#         liste.append((f'{chemin}/{img}', input(f'{img} : ')))
 
 pygame.init()
-creer_logimage_a_partir_png('Entrees/jazz_orchestra_puzzle.png', "Un peu d'ambiance !")
+
+# for chemin, titre_logimage in liste:
+#     creer_logimage_a_partir_png(chemin, titre_logimage)
+
+# impr_dic_logimage_logimage_sequences('Entrees/Images/UnPeuDambiance.png', "Un peu d'ambiance !")
+# creer_logimage_a_partir_png('Entrees/Images/UnPeuDambiance.png', "Un peu d'ambiance !")
+
+pygame.quit()

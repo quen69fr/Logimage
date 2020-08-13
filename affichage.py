@@ -3,6 +3,7 @@
 from outils import *
 from variables_globales import *
 import pygame
+import math
 
 
 def affiche_surface(surface: pygame.Surface, x: int, y: int, screen: pygame.Surface,
@@ -90,6 +91,8 @@ class Bouton:
             set_action_logimage_mode_crayon(not get_action_logimage_mode_crayon())
         elif self.type_action == TYPE_ACTION_CORRIGER_LOGIMAGE:
             set_action_corriger_logimage(not get_action_corriger_logimage())
+        elif self.type_action == TYPE_ACTION_POINTEUR:
+            set_action_pointeur(not get_action_pointeur())
 
     def clic(self, x_souris: int, y_souris: int):
         if self.x < x_souris < self.x + self.largeur and self.y < y_souris < self.y + self.hauteur:
@@ -112,6 +115,7 @@ class Bouton:
                 (self.type_action == TYPE_ACTION_TESTER_LOGIMAGE and get_action_test_creation()) or \
                 (self.type_action == TYPE_ACTION_COLORIER_CASE and get_action_colorier_case()) or \
                 (self.type_action == TYPE_ACTION_CRAYON and get_action_logimage_mode_crayon()) or \
+                (self.type_action == TYPE_ACTION_POINTEUR and get_action_pointeur()) or \
                 (self.type_action == TYPE_ACTION_CORRIGER_LOGIMAGE and get_action_corriger_logimage()):
             ecran = self.ecran_selectionne
 
@@ -119,17 +123,67 @@ class Bouton:
                         self.largeur, self.hauteur)
 
 
-class VignetteLogimage:
+class Vignette:
+    def __init__(self, rect, ecran):
+        self.x, self.y, self.largeur, self.hauteur = rect
+        self.ecran = ecran
+
+    def clic(self, x_souris: int, y_souris: int):
+        if self.x < x_souris < self.x + self.largeur and self.y < y_souris < self.y + self.hauteur:
+            return True
+        return False
+
+    def affiche(self, screen: pygame.Surface):
+        affiche_surface(self.ecran, self.x, self.y, screen, largeur=self.largeur, hauteur=self.hauteur)
+
+
+class VignetteCategorie(Vignette):
+    def __init__(self, categorie, rect, nb_logimages):
+        self.categorie = categorie
+        x, y, largeur, hauteur = rect
+        ecran = pygame.Surface((largeur, hauteur))
+        couleur1, couleur2, marge, texte = STYLE_VIGNETTE_LOGIMAGE
+        marge = max(1, int(largeur * marge))
+        police, taille = texte
+        taille *= largeur
+        centre_x = largeur // 2
+
+        ecran.fill(couleur1)
+        pygame.draw.rect(ecran, couleur2, (marge, marge, largeur - 2 * marge, hauteur - 2 * marge))
+
+        if self.categorie == CATEGORIE_IMPOSSIBLE:
+            couleur1 = COULEUR_ECHEC
+            texte = TEXTE_CATEGORIE_IMPOSSIBLE
+        elif self.categorie == CATEGORIE_INFAISABLE:
+            couleur1 = COULEUR_ECHEC
+            texte = TEXTE_CATEGORIE_INFAISABLE
+        elif self.categorie[1] == math.inf:
+            texte = f'+ de {self.categorie[0]}'
+        elif self.categorie[0] == 0:
+            texte = f'- de {self.categorie[1]}'
+        else:
+            texte = f'{self.categorie[0]}-{self.categorie[1]}'
+
+        affiche_texte(texte, centre_x, marge * 4, ecran, police,
+                      int(taille * 1.1), couleur1, x_0gauche_1centre_2droite=1)
+        affiche_texte(f'{nb_logimages} logimages', centre_x, hauteur - marge * 3, ecran, police,
+                      int(taille * 0.9), COULEUR_SECONDAIRE_VIGNETTE, x_0gauche_1centre_2droite=1,
+                      y_0haut_1centre_2bas=2)
+
+        Vignette.__init__(self, rect, ecran)
+
+
+class VignetteLogimage(Vignette):
     def __init__(self, nom, rect: tuple, titre: str, dimention: tuple, possible: bool, faisable: bool,
                  sauvegarde: bool):
         self.nom = nom
-        self.x, self.y, self.largeur, self.hauteur = rect
-        self.ecran = pygame.Surface((self.largeur, self.hauteur))
+        x, y, largeur, hauteur = rect
+        ecran = pygame.Surface((largeur, hauteur))
         couleur1, couleur2, marge, texte = STYLE_VIGNETTE_LOGIMAGE
-        marge = max(1, int(self.largeur * marge))
+        marge = max(1, int(largeur * marge))
         police, taille = texte
-        taille *= self.largeur
-        centre_x = self.largeur // 2
+        taille *= largeur
+        centre_x = largeur // 2
         texte = None
         couleur_texte = None
         decalage_y = 0
@@ -153,27 +207,22 @@ class VignetteLogimage:
             texte = TEXTE_SAUVEGARDE
             couleur_texte = COULEUR_SUCCES
 
-        self.ecran.fill(couleur1)
-        pygame.draw.rect(self.ecran, couleur2, (marge, marge, self.largeur - 2 * marge, self.hauteur - 2 * marge))
+        ecran.fill(couleur1)
+        pygame.draw.rect(ecran, couleur2, (marge, marge, largeur - 2 * marge, hauteur - 2 * marge))
         if sauvegarde:
             marge /= 2
         if len(titre) >= 12:
             coef_titre = (10 / len(titre)) ** 0.8
         else:
             coef_titre = 1
-        affiche_texte(titre, centre_x, self.hauteur // 2 - decalage_y, self.ecran, police,
+        affiche_texte(titre, centre_x, hauteur // 2 - decalage_y, ecran, police,
                       int(taille * 1.2 * coef_titre), couleur1, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
         if texte is not None:
-            affiche_texte(texte, centre_x, marge * 2, self.ecran, police, int(taille * 0.6), couleur_texte,
+            affiche_texte(texte, centre_x, marge * 2, ecran, police, int(taille * 0.6), couleur_texte,
                           x_0gauche_1centre_2droite=1)
         if dimention is not None:
-            affiche_texte(f'{dimention[0]}x{dimention[1]}', centre_x, self.hauteur - marge, self.ecran, police,
-                          int(taille * 0.9), GRIS_FONCE, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=2)
+            affiche_texte(f'{dimention[0]}x{dimention[1]}', centre_x, hauteur - marge, ecran, police,
+                          int(taille * 0.9), COULEUR_SECONDAIRE_VIGNETTE, x_0gauche_1centre_2droite=1,
+                          y_0haut_1centre_2bas=2)
 
-    def clic(self, x_souris: int, y_souris: int):
-        if self.x < x_souris < self.x + self.largeur and self.y < y_souris < self.y + self.hauteur:
-            return True
-        return False
-
-    def affiche(self, screen: pygame.Surface):
-        affiche_surface(self.ecran, self.x, self.y, screen, largeur=self.largeur, hauteur=self.hauteur)
+        Vignette.__init__(self, rect, ecran)

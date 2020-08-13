@@ -1,7 +1,6 @@
 # coding: utf-8
 
 from logimage import *
-import math
 
 
 class Fenetre:
@@ -36,6 +35,7 @@ class Fenetre:
             y_bouton += hauteur_bouton + MARGE_BOUTON
 
         self.liste_vignettes_choisi_logimage = []
+        self.categorie_vignettes = None
 
         self.mode_logimage = None
 
@@ -51,7 +51,7 @@ class Fenetre:
         self.mode = MODE_LOGIMAGE
 
         self.liste_boutons_logimage = []
-        nb_bouton = len(LISTE_ORDRE_BOUTONS_MODE[self.mode])
+        nb_bouton = len(LISTE_ORDRE_BOUTONS_MODE[self.logimage.mode_logimage])
         if nb_bouton > 0:
             largeur_bouton = MARGE_GRILLE_BORD_GAUCHE - 2 * MARGE_BOUTON
             hauteur_bouton = (HAUTEUR - MARGE_BOUTON * (nb_bouton + 1)) / nb_bouton
@@ -63,26 +63,64 @@ class Fenetre:
 
     def mode_choisi_logimage(self):
         self.mode = MODE_CHOISI_LOGIMAGE
-        liste_vignettes = []
+        liste_categories_bornes = []
+        old_borne = 0
+        for borne in BORNES_CATEGORIES + [math.inf]:
+            liste_categories_bornes.append((old_borne, borne))
+            old_borne = borne
+        dic_categories = {CATEGORIE_IMPOSSIBLE: [], CATEGORIE_INFAISABLE: []}
+        for categorie in liste_categories_bornes:
+            dic_categories[categorie] = []
+        logimage_en_cours = None
         for titre_sauvegarde_logimage in os.listdir(NOM_DOSSIER_SAUVEGARDE):
             with open(NOM_DOSSIER_SAUVEGARDE + titre_sauvegarde_logimage, "r") as sauvegarde_logimage:
                 dict_logimage = json.load(sauvegarde_logimage)
-                if (dict_logimage[PARAM_LOGIMAGE_POSSIBLE] and dict_logimage[PARAM_LOGIMAGE_FAISABLE] and
-                    not dict_logimage[PARAM_LOGIMAGE_MODE] == MODE_LOGIMAGE_FAIT) or \
-                        self.mode_logimage == dict_logimage[PARAM_LOGIMAGE_MODE]:
-                    liste_vignettes.append((titre_sauvegarde_logimage,
-                                            dict_logimage[PARAM_LOGIMAGE_NOM],
-                                            dict_logimage[PARAM_LOGIMAGE_DIMENTIONS],
-                                            dict_logimage[PARAM_LOGIMAGE_POSSIBLE],
-                                            dict_logimage[PARAM_LOGIMAGE_FAISABLE],
-                                            dict_logimage[PARAM_LOGIMAGE_MODE] == MODE_LOGIMAGE_FAIT))
-        liste_vignettes.sort(key=lambda logimage: 0 if logimage[5] else 1 if not logimage[3]
-                             else (logimage[2][0] * logimage[2][1]) if logimage[4] else 2)
-        if self.mode_logimage == MODE_LOGIMAGE_CREER or self.mode_logimage == MODE_LOGIMAGE_RENTRE:
-            liste_vignettes.insert(0, (NOM_NOUVEAU_LOGIMAGE, NOM_NOUVEAU_LOGIMAGE, None, None, None, False))
+                categorie = None
+                if not dict_logimage[PARAM_LOGIMAGE_POSSIBLE]:
+                    if dict_logimage[PARAM_LOGIMAGE_MODE] == self.mode_logimage:
+                        categorie = CATEGORIE_IMPOSSIBLE
+                elif not dict_logimage[PARAM_LOGIMAGE_FAISABLE]:
+                    if dict_logimage[PARAM_LOGIMAGE_MODE] == self.mode_logimage:
+                        categorie = CATEGORIE_INFAISABLE
+                else:
+                    for borne1, borne2 in liste_categories_bornes:
+                        p1, p2 = dict_logimage[PARAM_LOGIMAGE_DIMENTIONS]
+                        if borne1 <= p1 * p2 < borne2:
+                            categorie = (borne1, borne2)
+                            break
+                if dict_logimage[PARAM_LOGIMAGE_MODE] == MODE_LOGIMAGE_FAIT:
+                    logimage_en_cours = (titre_sauvegarde_logimage,
+                                         dict_logimage[PARAM_LOGIMAGE_NOM],
+                                         dict_logimage[PARAM_LOGIMAGE_DIMENTIONS],
+                                         dict_logimage[PARAM_LOGIMAGE_POSSIBLE],
+                                         dict_logimage[PARAM_LOGIMAGE_FAISABLE],
+                                         True)
+                else:
+                    if categorie is not None:
+                        dic_categories[categorie].append((titre_sauvegarde_logimage,
+                                                          dict_logimage[PARAM_LOGIMAGE_NOM],
+                                                          dict_logimage[PARAM_LOGIMAGE_DIMENTIONS],
+                                                          dict_logimage[PARAM_LOGIMAGE_POSSIBLE],
+                                                          dict_logimage[PARAM_LOGIMAGE_FAISABLE],
+                                                          False))
+
+        liste_vignettes = []
+        if self.categorie_vignettes is None:
+            for categorie, vignettes in dic_categories.items():
+                if len(vignettes) > 0:
+                    liste_vignettes.append((categorie, len(vignettes)))
+            if self.mode_logimage == MODE_LOGIMAGE_CREER or self.mode_logimage == MODE_LOGIMAGE_RENTRE:
+                liste_vignettes.insert(0, (NOM_NOUVEAU_LOGIMAGE, NOM_NOUVEAU_LOGIMAGE, None, None, None, False))
+            elif self.mode_logimage == MODE_LOGIMAGE_FAIT and logimage_en_cours is not None:
+                liste_vignettes.insert(0, logimage_en_cours)
+        else:
+            liste_vignettes = dic_categories[self.categorie_vignettes]
+            liste_vignettes.sort(key=lambda logimage: logimage[2][0] * logimage[2][1])
+
         if len(liste_vignettes) == 0:
             self.mode = MODE_ACCUEIL
             return
+
         nb_vignettes = len(liste_vignettes)
         nb_colonnes = math.ceil(math.sqrt(nb_vignettes))
         x_min = MARGE_BOUTON * 2
@@ -93,11 +131,15 @@ class Fenetre:
         i = 0
         for ligne in range(nb_colonnes):
             for colonne in range(nb_colonnes):
-                nom, titre, dimentions, possible, faisable, sauvegarde = liste_vignettes[i]
-                self.liste_vignettes_choisi_logimage.append(
-                    VignetteLogimage(nom, (x_min + colonne * (largeur + MARGE_BOUTON),
-                                           y_min + ligne * (hauteur + MARGE_BOUTON), largeur, hauteur),
-                                     titre, dimentions, possible, faisable, sauvegarde))
+                rect = (x_min + colonne * (largeur + MARGE_BOUTON), y_min + ligne * (hauteur + MARGE_BOUTON),
+                        largeur, hauteur)
+                if len(liste_vignettes[i]) == 2:
+                    categorie, nb_logimages = liste_vignettes[i]
+                    vignettes = VignetteCategorie(categorie, rect, nb_logimages)
+                else:
+                    nom, titre, dimentions, possible, faisable, sauvegarde = liste_vignettes[i]
+                    vignettes = VignetteLogimage(nom, rect, titre, dimentions, possible, faisable, sauvegarde)
+                self.liste_vignettes_choisi_logimage.append(vignettes)
                 i += 1
                 if i >= nb_vignettes:
                     return
@@ -112,6 +154,7 @@ class Fenetre:
                 self.mode_logimage = MODE_LOGIMAGE_IMPR
             else:
                 self.mode_logimage = MODE_LOGIMAGE_FAIT
+            self.categorie_vignettes = None
             self.mode_choisi_logimage()
         elif self.mode == MODE_LOGIMAGE:
             if bouton.type_action == TYPE_ACTION_TESTER_LOGIMAGE:
@@ -154,9 +197,10 @@ class Fenetre:
                     if event.key == 97:  # Q
                         self.running = False
                         break
-                if self.bouton_full_screen.gere_clavier(event):
-                    self.full_screen = not self.full_screen
-                    self.update_full_screen()
+                    if self.bouton_full_screen.gere_clavier(event):
+                        self.full_screen = not self.full_screen
+                        self.update_full_screen()
+                        break
                 if self.mode == MODE_ACCUEIL:
                     for bouton in self.boutons_accueil:
                         if bouton.gere_clavier(event):
@@ -195,13 +239,18 @@ class Fenetre:
                     if self.mode == MODE_CHOISI_LOGIMAGE:
                         for vignette in self.liste_vignettes_choisi_logimage:
                             if vignette.clic(self.x_souris, self.y_souris):
-                                if self.mode_logimage == MODE_LOGIMAGE_IMPR:
-                                    impr_logimage_sauvegarde(vignette.nom)
+                                if isinstance(vignette, VignetteCategorie):
+                                    self.categorie_vignettes = vignette.categorie
+                                    self.mode_choisi_logimage()
                                 else:
-                                    if vignette.nom == NOM_NOUVEAU_LOGIMAGE:
-                                        self.new_logimage(create_logimage_nouveau(self.mode_logimage))
+                                    if self.mode_logimage == MODE_LOGIMAGE_IMPR:
+                                        impr_logimage_sauvegarde(vignette.nom)
                                     else:
-                                        self.new_logimage(create_logimage_sauvegarde(vignette.nom, self.mode_logimage))
+                                        if vignette.nom == NOM_NOUVEAU_LOGIMAGE:
+                                            self.new_logimage(create_logimage_nouveau(self.mode_logimage))
+                                        else:
+                                            self.new_logimage(create_logimage_sauvegarde(vignette.nom,
+                                                                                         self.mode_logimage))
                                 break
                     else:
                         sens = -1 if (event.button == 3 or event.button == 5) else 1

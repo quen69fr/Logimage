@@ -95,6 +95,7 @@ class Logimage:
             self.nb_lignes_sequences_colonne += 1
         if self.mode_logimage == MODE_LOGIMAGE_FAIT:
             self.dic_points_crayon = {}
+            self.liste_cases_rayees = []
             self.taille_point_crayon = 0
 
         self.update_sequences_auto = self.mode_logimage == MODE_LOGIMAGE_CREER
@@ -157,7 +158,14 @@ class Logimage:
         return True
 
     def corrige_logimage(self):
+        print_correction(f'Correction de {self.titre.texte} :')
+        t0 = time.time()
         potentiellement_impossible = not self.update_sequences_auto
+        lignes_erreur_memoire = []
+        colonnes_erreur_memoire = []
+        clear_possibilitees_pour_x_sur_n()
+        set_plus_lent_moins_de_memoire(False)
+        plus_lent_et_moins_de_memoire = False
         cases = [[CASE_INCONNUE for _ in range(self.nb_colonnes)] for _ in range(self.nb_lignes)]
         cases_ordonnees_colonnes = []
         for j in range(len(cases[0])):
@@ -200,43 +208,60 @@ class Logimage:
                                 stop = True
                                 break
                         continue
-                    print_correction(f'ligne {i}')
-                    liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense(ligne, liste_nbs)
-                    if potentiellement_impossible:
-                        if len(liste_possibilitees) == 0:
-                            print_correction('----- IMPOSSIBLE -----')
-                            self.possible = False
-                            stop = True
-                            break
+                    print_correction(f'ligne {i}:')
                     etape = False
-                    for j, case in enumerate(ligne):
-                        if case == CASE_INCONNUE:
-                            valeur_case = liste_possibilitees[0][j]
-                            for possibilitee in liste_possibilitees:
-                                if not possibilitee[j] == valeur_case:
-                                    valeur_case = None
-                                    break
-                            if valeur_case is not None:
-                                print_correction(f'-------- case {i}, {j}')
-                                cases[i][j] = valeur_case
-                                cases_ordonnees_colonnes[j][i] = valeur_case
-                                if j not in colonnes_a_tester:
-                                    colonnes_a_tester.append(j)
-                                etape = True
-                                if not test_reste_cases_inconnues(cases):
-                                    print_correction('-------- FIN --------')
-                                    self.faisable = True
-                                    nb_etapes += 1
-                                    stop = True
-                                    break
+                    try:
+                        liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense(ligne, liste_nbs)
+                    except MemoryError:
+                        print_correction('Erreur : trop de possibilités')
+                        if i not in lignes_erreur_memoire:
+                            lignes_erreur_memoire.append(i)
+                    else:
+                        if i in lignes_erreur_memoire:
+                            lignes_erreur_memoire.remove(i)
+                        if potentiellement_impossible:
+                            if len(liste_possibilitees) == 0:
+                                print_correction('----- IMPOSSIBLE -----')
+                                self.possible = False
+                                stop = True
+                                break
+                        for j, case in enumerate(ligne):
+                            if case == CASE_INCONNUE:
+                                valeur_case = liste_possibilitees[0][j]
+                                for possibilitee in liste_possibilitees:
+                                    if not possibilitee[j] == valeur_case:
+                                        valeur_case = None
+                                        break
+                                if valeur_case is not None:
+                                    print_correction(f'-------- case {i}, {j}')
+                                    cases[i][j] = valeur_case
+                                    cases_ordonnees_colonnes[j][i] = valeur_case
+                                    if j not in colonnes_a_tester:
+                                        colonnes_a_tester.append(j)
+                                    etape = True
+                                    if not test_reste_cases_inconnues(cases):
+                                        print_correction('-------- FIN --------')
+                                        self.faisable = True
+                                        nb_etapes += 1
+                                        stop = True
+                                        break
                     if etape:
                         nb_etapes += 1
                 if stop:
                     break
-                if len(colonnes_a_tester) == 0:
-                    print_correction('----- INFAISABLE -----')
-                    break
                 lignes_a_tester = []
+                if len(colonnes_a_tester) == 0:
+                    if not plus_lent_et_moins_de_memoire and (len(lignes_erreur_memoire) > 0 or
+                                                              len(colonnes_erreur_memoire) > 0):
+                        clear_possibilitees_pour_x_sur_n()
+                        lignes_a_tester = lignes_erreur_memoire[:]
+                        colonnes_a_tester = colonnes_erreur_memoire[:]
+                        plus_lent_et_moins_de_memoire = True
+                        set_plus_lent_moins_de_memoire(True)
+                        print_correction('==> Mode plus long moins de mémoire')
+                    else:
+                        print_correction('----- INFAISABLE -----')
+                        break
 
                 for j in colonnes_a_tester:
                     if stop:
@@ -262,51 +287,73 @@ class Logimage:
                                 stop = True
                                 break
                         continue
-                    print_correction(f'colonne {j}')
-                    liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense(colonne, liste_nbs)
-                    if potentiellement_impossible:
-                        if len(liste_possibilitees) == 0:
-                            print_correction('----- IMPOSSIBLE -----')
-                            self.possible = False
-                            stop = True
-                            break
+                    print_correction(f'colonne {j}:')
                     etape = False
-                    for i, case in enumerate(colonne):
-                        if case == CASE_INCONNUE:
-                            valeur_case = liste_possibilitees[0][i]
-                            for possibilitee in liste_possibilitees:
-                                if not possibilitee[i] == valeur_case:
-                                    valeur_case = None
-                                    break
-                            if valeur_case is not None:
-                                print_correction(f'-------- case {i}, {j}')
-                                cases[i][j] = valeur_case
-                                cases_ordonnees_colonnes[j][i] = valeur_case
-                                if i not in lignes_a_tester:
-                                    lignes_a_tester.append(i)
-                                etape = True
-                                if not test_reste_cases_inconnues(cases):
-                                    print_correction('-------- FIN --------')
-                                    self.faisable = True
-                                    nb_etapes += 1
-                                    stop = True
-                                    break
+                    try:
+                        liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense(colonne, liste_nbs)
+                    except MemoryError:
+                        print_correction('Erreur : trop de possibilités')
+                        if j not in colonnes_erreur_memoire:
+                            colonnes_erreur_memoire.append(j)
+                    else:
+                        if j in colonnes_erreur_memoire:
+                            colonnes_erreur_memoire.remove(j)
+                        if potentiellement_impossible:
+                            if len(liste_possibilitees) == 0:
+                                print_correction('----- IMPOSSIBLE -----')
+                                self.possible = False
+                                stop = True
+                                break
+                        for i, case in enumerate(colonne):
+                            if case == CASE_INCONNUE:
+                                valeur_case = liste_possibilitees[0][i]
+                                for possibilitee in liste_possibilitees:
+                                    if not possibilitee[i] == valeur_case:
+                                        valeur_case = None
+                                        break
+                                if valeur_case is not None:
+                                    print_correction(f'-------- case {i}, {j}')
+                                    cases[i][j] = valeur_case
+                                    cases_ordonnees_colonnes[j][i] = valeur_case
+                                    if i not in lignes_a_tester:
+                                        lignes_a_tester.append(i)
+                                    etape = True
+                                    if not test_reste_cases_inconnues(cases):
+                                        print_correction('-------- FIN --------')
+                                        self.faisable = True
+                                        nb_etapes += 1
+                                        stop = True
+                                        break
                     if etape:
                         nb_etapes += 1
                 if stop:
                     break
-                if len(lignes_a_tester) == 0:
-                    print_correction('----- INFAISABLE -----')
-                    break
                 colonnes_a_tester = []
+                if len(lignes_a_tester) == 0:
+                    if not plus_lent_et_moins_de_memoire and (len(lignes_erreur_memoire) > 0 or
+                                                              len(colonnes_erreur_memoire) > 0):
+                        clear_possibilitees_pour_x_sur_n()
+                        lignes_a_tester = lignes_erreur_memoire[:]
+                        colonnes_a_tester = colonnes_erreur_memoire[:]
+                        plus_lent_et_moins_de_memoire = True
+                        set_plus_lent_moins_de_memoire(True)
+                        print_correction('==> Mode plus long moins de mémoire')
+                    else:
+                        print_correction('----- INFAISABLE -----')
+                        break
+
+        print_correction(f'Durée totale : {int((time.time() - t0) // 60)} min {round((time.time() - t0) % 60, 2)} sec')
 
         if self.possible:
             self.nb_etapes_ordinateur = nb_etapes
             self.corrige = cases
+            if not self.faisable and (len(lignes_erreur_memoire) > 0 or len(colonnes_erreur_memoire) > 0):
+                return False
         else:
             self.faisable = None
             self.nb_etapes_ordinateur = None
             self.corrige = None
+        return True
 
     def return_dict_logimage(self):
         if self.mode_logimage == MODE_LOGIMAGE_CREER:
@@ -330,12 +377,20 @@ class Logimage:
             PARAM_LOGIMAGE_MODE: self.mode_logimage
         }
 
-    def sauvegarde_logimage(self):
+    def sauvegarde_logimage(self, dossier_sauvegarde=NOM_DOSSIER_SAUVEGARDE):
         if not self.mode_logimage == MODE_LOGIMAGE_FAIT:
-            self.corrige_logimage()
+            try:
+                correction = self.corrige_logimage()
+            except MemoryError:
+                return False
+            else:
+                if not correction:
+                    return False
+
         titre = NOM_FICHIER_SAUVEGARDE if self.mode_logimage == MODE_LOGIMAGE_FAIT else self.titre.titre_sauvegarde
-        with open(NOM_DOSSIER_SAUVEGARDE + titre, 'w') as sauvegarde_logimage:
+        with open(dossier_sauvegarde + titre, 'w') as sauvegarde_logimage:
             json.dump(self.return_dict_logimage(), sauvegarde_logimage)
+        return True
 
     def imprime_png(self, suplement_nom: str):
         largeur = self.largeur_ecran + MARGE_COTE_IMPR * 2
@@ -759,14 +814,8 @@ class Logimage:
                     self.derniere_case_modifiee = (i, j)
                     if 0 <= i < self.nb_lignes and 0 <= j < self.nb_colonnes:
                         self.gere_clic_down_grille(i, j, sens)
-
-                    elif self.mode_logimage == MODE_LOGIMAGE_RENTRE:
-                        if - self.nb_colonnes_sequences_ligne <= j < 0 <= i < self.nb_lignes:
-                            num = j + len(self.sequences_lignes[i])
-                            self.gere_clic_down_sequences_lignes(i, num, sens)
-                        elif - self.nb_lignes_sequences_colonne <= i < 0 <= j < self.nb_colonnes:
-                            num = i + len(self.sequences_colonnes[j])
-                            self.gere_clic_down_sequences_colonnes(j, num, sens)
+                    else:
+                        self.gere_clic_down_hors_grille(i, j, sens)
 
     def gere_clic_up_grille(self, ligne, colonne, sens):
         action_logimage_ligne_possible_ = get_action_logimage_ligne_possible()
@@ -829,35 +878,50 @@ class Logimage:
                     index -= len(LISTE_ORDRE_VALEUR_CASE_CLIC) - 2
                 self.set_case_grille(ligne, colonne, LISTE_ORDRE_VALEUR_CASE_CLIC[index])
 
-    def gere_clic_down_sequences_lignes(self, ligne, num, sens):
+    def gere_clic_down_hors_grille(self, i, j, sens):
         if self.mode_logimage == MODE_LOGIMAGE_RENTRE:
-            if sens == 1:
-                if num >= 0:
-                    self.set_case_sequence_ligne(ligne, num, self.get_case_sequence_ligne(ligne, num) + 1)
-                else:
-                    self.add_case_sequence_ligne(ligne, 1)
-            else:
-                if num >= 0:
-                    case = self.get_case_sequence_ligne(ligne, num)
-                    if case > 1:
-                        self.set_case_sequence_ligne(ligne, num, case - 1)
-                    else:
-                        self.remove_case_sequence_ligne(ligne, num)
+            if self.nb_lignes > i >= 0 > j >= - self.nb_colonnes_sequences_ligne:
+                num = j + len(self.sequences_lignes[i])
+                self.gere_clic_down_sequences_lignes_mode_rentre(i, num, sens)
+            elif self.nb_colonnes > j >= 0 > i >= - self.nb_lignes_sequences_colonne:
+                num = i + len(self.sequences_colonnes[j])
+                self.gere_clic_down_sequences_colonnes_mode_rentre(j, num, sens)
 
-    def gere_clic_down_sequences_colonnes(self, colonne, num, sens):
-        if self.mode_logimage == MODE_LOGIMAGE_RENTRE:
-            if sens == 1:
-                if num >= 0:
-                    self.set_case_sequence_colonne(colonne, num, self.get_case_sequence_colonne(colonne, num) + 1)
+        if self.mode_logimage == MODE_LOGIMAGE_FAIT:
+            if self.nb_lignes > i >= 0 > j >= - self.nb_colonnes_sequences_ligne or \
+                    - self.nb_colonnes > j >= 0 > i >= - self.nb_lignes_sequences_colonne:
+                if (i, j) in self.liste_cases_rayees:
+                    self.liste_cases_rayees.remove((i, j))
                 else:
-                    self.add_case_sequence_colonne(colonne, 1)
+                    self.liste_cases_rayees.append((i, j))
+
+    def gere_clic_down_sequences_lignes_mode_rentre(self, ligne, num, sens):
+        if sens == 1:
+            if num >= 0:
+                self.set_case_sequence_ligne(ligne, num, self.get_case_sequence_ligne(ligne, num) + 1)
             else:
-                if num >= 0:
-                    case = self.get_case_sequence_colonne(colonne, num)
-                    if case > 1:
-                        self.set_case_sequence_colonne(colonne, num, case - 1)
-                    else:
-                        self.remove_case_sequence_colonne(colonne, num)
+                self.add_case_sequence_ligne(ligne, 1)
+        else:
+            if num >= 0:
+                case = self.get_case_sequence_ligne(ligne, num)
+                if case > 1:
+                    self.set_case_sequence_ligne(ligne, num, case - 1)
+                else:
+                    self.remove_case_sequence_ligne(ligne, num)
+
+    def gere_clic_down_sequences_colonnes_mode_rentre(self, colonne, num, sens):
+        if sens == 1:
+            if num >= 0:
+                self.set_case_sequence_colonne(colonne, num, self.get_case_sequence_colonne(colonne, num) + 1)
+            else:
+                self.add_case_sequence_colonne(colonne, 1)
+        else:
+            if num >= 0:
+                case = self.get_case_sequence_colonne(colonne, num)
+                if case > 1:
+                    self.set_case_sequence_colonne(colonne, num, case - 1)
+                else:
+                    self.remove_case_sequence_colonne(colonne, num)
 
     def gere_clic_up_intersection(self, ligne, colonne):
         action_logimage_ligne_possible_ = get_action_logimage_ligne_possible()
@@ -979,6 +1043,7 @@ class Logimage:
         action_test_creation_ = get_action_test_creation()
         action_colorier_case_ = get_action_colorier_case()
         action_corriger_logimage_ = get_action_corriger_logimage()
+        action_pointeur_ = get_action_pointeur()
 
         if action_logimage_ligne_possible_ is not None:
             if action_logimage_ligne_possible_ == ACTION_ADD_1 or action_logimage_ligne_possible_ == ACTION_ADD_GROUPE:
@@ -1095,6 +1160,24 @@ class Logimage:
                                            (self.x_ecran + x + demi_cote_case + i * decalage,
                                             self.y_ecran + y + demi_cote_case),
                                            self.taille_point_crayon)
+
+        if action_pointeur_:
+            ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
+            if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
+                x, y = self.get_pos_case(ligne, colonne)
+                d = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                cote = self.cote_case - self.taille_quadrillage
+                affiche_rect_transparent((self.x_ecran + d, self.y_ecran + y, self.largeur_ecran - 2 * d, cote),
+                                         screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+                affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote, self.hauteur_ecran - 2 * d),
+                                         screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+
+            for i, j in self.liste_cases_rayees:
+                x, y = self.get_pos_case(i, j)
+                affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y,
+                                          self.cote_case - self.taille_quadrillage,
+                                          self.cote_case - self.taille_quadrillage),
+                                         screen, NOIR, 150)
 
     def affiche(self, screen: pygame.Surface):
         self.update_affichage()

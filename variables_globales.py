@@ -6,6 +6,7 @@ action_test_creation = False
 action_corriger_logimage = False
 action_colorier_case = False
 action_logimage_mode_crayon = False
+action_pointeur = False
 
 
 def reset_variables_globales():
@@ -15,12 +16,14 @@ def reset_variables_globales():
     global action_corriger_logimage
     global action_colorier_case
     global action_logimage_mode_crayon
+    global action_pointeur
     action_logimage_ligne_possible = None
     action_logimage_colonne_possible = None
     action_test_creation = False
     action_corriger_logimage = False
     action_colorier_case = False
     action_logimage_mode_crayon = False
+    action_pointeur = False
 
 
 def get_action_logimage_ligne_possible():
@@ -81,3 +84,13 @@ def get_action_logimage_mode_crayon():
 def set_action_logimage_mode_crayon(valeur):
     global action_logimage_mode_crayon
     action_logimage_mode_crayon = valeur
+
+
+def get_action_pointeur():
+    global action_pointeur
+    return action_pointeur
+
+
+def set_action_pointeur(valeur):
+    global action_pointeur
+    action_pointeur = valeur
