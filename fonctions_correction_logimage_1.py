@@ -3,8 +3,7 @@
 from outils import *
 import time
 
-PRINT_CORRECTION = False
-plus_lent_moins_de_memoire = False
+plus_lent_moins_de_memoire = True
 possibilitees_pour_x_sur_n = {}
 
 LISTE_TRUE = [True]
@@ -19,11 +18,6 @@ def set_plus_lent_moins_de_memoire(value):
 def clear_possibilitees_pour_x_sur_n():
     global possibilitees_pour_x_sur_n
     possibilitees_pour_x_sur_n.clear()
-
-
-def print_correction(string: str):
-    if PRINT_CORRECTION:
-        print(string)
 
 
 def find_toutes_possibilitees_pour_x_sur_n(x, n):
@@ -162,7 +156,7 @@ def find_toutes_les_possibilitees_d_une_sequense(cases: list, sequence: list):
     dt1 = round(t2 - t1, 2)
     dt2 = round(t3 - t2, 2)
 
-    print_correction(f'{dtT}s  --> {dt1}s  +  {dt2}s  ({len(liste_possibilitees)} possibilitées)')
+    print_correction(f'-> {dtT} sec  =  {dt1}s  +  {dt2}s  ({len(liste_possibilitees)} possibilitées retenues)')
 
     return liste_possibilitees
 
@@ -172,3 +166,24 @@ def test_reste_cases_inconnues(cases):
         if CASE_INCONNUE in ligne:
             return True
     return False
+
+
+def trouve_cases_communes_rapide_memoire(ligne, sequence):
+    try:
+        liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense(ligne, sequence)
+    except MemoryError:
+        return RETURN_ERREUR_MEMOIRE
+    else:
+        if len(liste_possibilitees) == 0:
+            return None
+        liste_cases_communes = []
+        for j, case in enumerate(ligne):
+            if case == CASE_INCONNUE:
+                valeur_case = liste_possibilitees[0][j]
+                for possibilitee in liste_possibilitees:
+                    if not possibilitee[j] == valeur_case:
+                        valeur_case = None
+                        break
+                if valeur_case is not None:
+                    liste_cases_communes.append((j, valeur_case))
+        return liste_cases_communes

@@ -15,6 +15,7 @@ class Fenetre:
 
         self.mode = MODE_ACCUEIL
 
+        init_grille_derges()
         self.logimage = None
         self.liste_boutons_logimage = []
 
@@ -170,15 +171,18 @@ class Fenetre:
             elif bouton.type == BOUTON_RECOMMENCER_LOGIMAGE:
                 self.logimage.mettre_toutes_cases_valeur(CASE_INCONNUE)
                 self.logimage.efface_tout_crayon()
+                self.logimage.efface_cases_rayees()
                 reset_variables_globales()
             elif bouton.type == BOUTON_RETOUR_SANS_ERREUR:
                 self.logimage.reprendre_dernier_cases_sans_erreurs()
+                self.logimage.efface_cases_rayees()
             elif bouton.type == BOUTON_CORRIGER_ERREURS_LOGIMAGE:
                 self.logimage.corrige_erreurs()
             elif bouton.type == BOUTON_ENLEVE_ERREURS_LOGIMAGE:
                 self.logimage.enleve_erreurs()
             elif bouton.type == BOUTON_AFFICHER_CORRECTION:
                 self.logimage.tout_corriger()
+                self.logimage.efface_cases_rayees()
             elif bouton.type == BOUTON_COLORIER_UNE_CASE:
                 set_action_logimage_mode_crayon(False)
             elif bouton.type == BOUTON_CRAYON:

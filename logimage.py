@@ -1,7 +1,7 @@
 # coding: utf-8
 
 from titre import *
-from fonctions_correction_logimage import *
+from fonctions_correction_logimage_mixe_1_2 import *
 import json
 import copy
 
@@ -157,7 +157,7 @@ class Logimage:
             return False
         return True
 
-    def corrige_logimage(self):
+    def corrige_logimage_old(self):
         print_correction(f'Correction de {self.titre.texte} :')
         t0 = time.time()
         potentiellement_impossible = not self.update_sequences_auto
@@ -354,6 +354,164 @@ class Logimage:
             self.nb_etapes_ordinateur = None
             self.corrige = None
         return True
+
+    def corrige_logimage(self):
+        print_correction(f'Correction de {self.titre.texte} :')
+        t0 = time.time()
+        potentiellement_impossible = not self.update_sequences_auto
+
+        cases = [[CASE_INCONNUE for _ in range(self.nb_colonnes)] for _ in range(self.nb_lignes)]
+
+        cases_ordonnees_colonnes = [[CASE_INCONNUE for _ in range(self.nb_lignes)] for _ in range(self.nb_colonnes)]
+        erreur_memoire = False
+
+        nb_cases_fixees = 0
+        nb_cases_a_fixees = self.nb_lignes * self.nb_colonnes
+
+        self.possible = self.teste_coherence_sequences()
+
+        self.nb_etapes_ordinateur = 0
+        if self.possible:
+            self.faisable = False
+            stop = False
+            lignes_a_tester = [i for i in range(self.nb_lignes)]
+            colonnes_a_tester = [j for j in range(self.nb_colonnes)]
+            while not stop:
+                # Les lignes :
+                for i in lignes_a_tester:
+                    if stop:
+                        break
+                    ligne = cases[i]
+                    liste_nbs = self.sequences_lignes[i]
+                    if CASE_INCONNUE not in ligne:
+                        if potentiellement_impossible:
+                            sequence_ligne = []
+                            n = 0
+                            for case in ligne:
+                                if case:
+                                    n += 1
+                                else:
+                                    if n > 0:
+                                        sequence_ligne.append(n)
+                                        n = 0
+                            if n > 0:
+                                sequence_ligne.append(n)
+                            if not sequence_ligne == liste_nbs:
+                                self.possible = False
+                                stop = True
+                                break
+                        continue
+
+                    print_correction(f'___ LIGNE {i} ___')
+                    liste_cases_communes = trouve_cases_communes_intelligent(ligne, liste_nbs)
+
+                    if liste_cases_communes is None:
+                        self.possible = False
+                        stop = True
+                        break
+                    elif liste_cases_communes == RETURN_ERREUR_MEMOIRE:
+                        erreur_memoire = True
+                    else:
+                        if len(liste_cases_communes) > 0:
+                            self.nb_etapes_ordinateur += 1
+                            for j, valeur in liste_cases_communes:
+                                print_correction(f'-------> case {i}, {j}')
+                                cases[i][j] = valeur
+                                cases_ordonnees_colonnes[j][i] = valeur
+                                if j not in colonnes_a_tester:
+                                    colonnes_a_tester.append(j)
+                            nb_cases_fixees += len(liste_cases_communes)
+                            if nb_cases_fixees >= nb_cases_a_fixees:
+                                self.faisable = True
+                                stop = True
+                                break
+                if stop:
+                    break
+                lignes_a_tester = []
+                if len(colonnes_a_tester) == 0:
+                    break
+
+                # Les colonnes :
+                for j in colonnes_a_tester:
+                    if stop:
+                        break
+                    colonne = cases_ordonnees_colonnes[j]
+                    liste_nbs = self.sequences_colonnes[j]
+                    if CASE_INCONNUE not in colonne:
+                        if potentiellement_impossible:
+                            sequence_colonne = []
+                            n = 0
+                            for case in colonne:
+                                if case:
+                                    n += 1
+                                else:
+                                    if n > 0:
+                                        sequence_colonne.append(n)
+                                        n = 0
+                            if n > 0:
+                                sequence_colonne.append(n)
+                            if not sequence_colonne == liste_nbs:
+                                self.possible = False
+                                stop = True
+                                break
+                        continue
+
+                    print_correction(f'___ COLONNE {j} ___')
+                    liste_cases_communes = trouve_cases_communes_intelligent(colonne, liste_nbs)
+
+                    if liste_cases_communes is None:
+                        self.possible = False
+                        stop = True
+                        break
+                    elif liste_cases_communes == RETURN_ERREUR_MEMOIRE:
+                        erreur_memoire = True
+                    else:
+                        if len(liste_cases_communes) > 0:
+                            self.nb_etapes_ordinateur += 1
+                            for i, valeur in liste_cases_communes:
+                                print_correction(f'-------> case {i}, {j}')
+                                cases[i][j] = valeur
+                                cases_ordonnees_colonnes[j][i] = valeur
+                                if i not in lignes_a_tester:
+                                    lignes_a_tester.append(i)
+                            nb_cases_fixees += len(liste_cases_communes)
+                            if nb_cases_fixees >= nb_cases_a_fixees:
+                                self.faisable = True
+                                stop = True
+                                break
+
+                if stop:
+                    break
+                colonnes_a_tester = []
+                if len(lignes_a_tester) == 0:
+                    break
+
+        if self.possible:
+            self.corrige = cases
+            if self.faisable:
+                print_correction('-------- FIN --------')
+                erreur_memoire = False
+            else:
+                if erreur_memoire:
+                    self.possible = False
+                    self.faisable = None
+                    self.nb_etapes_ordinateur = None
+                    self.corrige = None
+                    print_correction('-------- ERREUR --------')
+                else:
+                    print_correction('----- INFAISABLE -----')
+
+        else:
+            self.faisable = None
+            self.nb_etapes_ordinateur = None
+            self.corrige = None
+            erreur_memoire = False
+            print_correction('----- IMPOSSIBLE -----')
+
+        print_correction('')
+        print_correction(f'Durée totale : {int((time.time() - t0) // 60)} min {round((time.time() - t0) % 60, 2)} sec')
+
+        return not erreur_memoire
 
     def return_dict_logimage(self):
         if self.mode_logimage == MODE_LOGIMAGE_CREER:
@@ -732,6 +890,9 @@ class Logimage:
     def efface_tout_crayon(self):
         if self.mode_logimage == MODE_LOGIMAGE_FAIT:
             self.dic_points_crayon = {}
+
+    def efface_cases_rayees(self):
+        self.liste_cases_rayees = []
 
     # -----------------------------------------------------------------
 
