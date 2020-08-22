@@ -2,13 +2,17 @@
 
 FULL_SCREEN = False
 
-MODE_LOGIMAGE_PEU_DE_MEMOIRE_MAIS_PLUS_LENT = False
-SEUIL_MAX_METODE_CORRECTION_RAPIDE = 1000000
-SEUIL_MAX_METODE_CORRECTION_RAPIDE_MOINS_MEMOIRE = 1800000
-SEUIL_MAX_CORRECTION = 100000000
-DEGRES_X_MAX_METHODE_2_CORRECTION_LOGIMAGE = 50, 10
-PRINT_CORRECTION = True
+# MODE_LOGIMAGE_PEU_DE_MEMOIRE_MAIS_PLUS_LENT = False
+COEF_RENTABILITE_METHODE_1 = 0.2
+SEUIL_MAX_METODE_RECURSIVE_SANS_MEMOIRE = 2000000
+SEUIL_MAX_METODE_RECURSIVE_AVEC_MEMOIRE = 300000
+SEUIL_MAX_CORRECTION = 1000000000  # Faisable mais TRES long ...
+SEUIL_RENTABILITE_METHODE_GROSSIERE = 1000
+DEGRES_X_MAX_METHODE_2_CORRECTION_LOGIMAGE = 50, 50
 RETURN_ERREUR_MEMOIRE = 'erreur'
+SAUVEGARDE_CASES_SI_CORRECTION_PAS_COMPLETE = True
+PRINT_CORRECTION = True
+AFFICHE_DETAILS_METHODE_GROSSIERE = True
 
 
 def print_correction(string: str):
@@ -35,8 +39,113 @@ ROUGE = (255, 0, 0)
 ORANGE = (255, 127, 0)
 JAUNE = (255, 230, 0)
 
-FPS = 50
-CAPTION = 'Logimage'
+FPS = 70
+CAPTION = 'Logimages (Quentin PALAZON)'
+
+# SOURIS_NORMALE = ("X               ",
+#                   "XX              ",
+#                   "X.X             ",
+#                   "X..X            ",
+#                   "X...X           ",
+#                   "X....X          ",
+#                   "X.....X         ",
+#                   "X......X        ",
+#                   "X.......X       ",
+#                   "X........X      ",
+#                   "X.........X     ",
+#                   "X......XXXXX    ",
+#                   "X...X..X        ",
+#                   "X..XX..X        ",
+#                   "X.X  X..X       ",
+#                   "XX   X..X       ",
+#                   "X     X..X      ",
+#                   "      X..X      ",
+#                   "       XX       ",
+#                   "                ",
+#                   "                ",
+#                   "                ",
+#                   "                ",
+#                   "                ")
+# SOURIS_NORMALE = ("     XX         ",
+#                   "    X..X        ",
+#                   "    X..X        ",
+#                   "    X..X        ",
+#                   "    X..XXXXX    ",
+#                   "    X..X..X.XX  ",
+#                   " XX X..X..X.X.X ",
+#                   "X..XX.........X ",
+#                   "X...X.........X ",
+#                   "XX.....X.X.X..X ",
+#                   "  X....X.X.X..X ",
+#                   "  X....X.X.X.X  ",
+#                   "   X...X.X.X.X  ",
+#                   "    X.......X   ",
+#                   "     X......X   ",
+#                   "     XXXXXXXX   ",)
+SOURIS_NORMALE = ((32, 32), (11, 1), ("          XXXX                  ",
+                                      "         XXXXXX                 ",
+                                      "        XXX..XXX                ",
+                                      "        XX....XX                ",
+                                      "        XX....XX                ",
+                                      "        XX....XX                ",
+                                      "        XX....XX                ",
+                                      "        XX....XX                ",
+                                      "        XX....XXXXXXXXXX        ",
+                                      "        XX....XXXXXXXXXXX       ",
+                                      "        XX....XX....XX.XXXXX    ",
+                                      "        XX....XX....XX..XXXXX   ",
+                                      "  XXXX  XX....XX....XX..XX.XXX  ",
+                                      " XXXXXX XX....XX....XX..XX..XX  ",
+                                      "XXX..XXXXX....XX....XX......XX  ",
+                                      "XX....XXXX..................XX  ",
+                                      "XX......XX..................XX  ",
+                                      "XX......XX..................XX  ",
+                                      "XXXX..........XX..XX..XX....XX  ",
+                                      " XXXX.........XX..XX..XX....XX  ",
+                                      "   XXX........XX..XX..XX...XXX  ",
+                                      "    XX........XX..XX..XX...XX   ",
+                                      "    XXX.......XX..XX..XX..XXX   ",
+                                      "     XX.......XX..XX..XX..XX    ",
+                                      "     XXX......XX..XX..XX..XX    ",
+                                      "      XXX.....XX..XX.....XXX    ",
+                                      "       XXX...............XX     ",
+                                      "        XXX.............XX      ",
+                                      "         XXX............XX      ",
+                                      "          XX............XX      ",
+                                      "          XXXXXXXXXXXXXXXX      ",
+                                      "           XXXXXXXXXXXXXX       "))
+SOURIS_COLORIER = ((16, 16), (0, 0), ("...             ",
+                                      ".XX..           ",
+                                      ".XXXX..         ",
+                                      " .XXXXX..       ",
+                                      " .XXXXXXX..     ",
+                                      "  .XXXXXXXX..   ",
+                                      "  .XXXXXXXXXX.. ",
+                                      "   .XXXXXXXXXXX.",
+                                      "   .XXXXXXXXXXX.",
+                                      "    .XXXX...... ",
+                                      "    .XXXX.      ",
+                                      "     .XXX.      ",
+                                      "     .XXX.      ",
+                                      "      .XX.      ",
+                                      "      .XX.      ",
+                                      "       ..       ",))
+SOURIS_DESSIN = ((16, 16), (0, 0), ("XXXX            ",
+                                    "X...XX          ",
+                                    "X..XXXX         ",
+                                    "X.XXX.XX        ",
+                                    " XXX...XX       ",
+                                    " XX.....XX      ",
+                                    "  XX.....XX     ",
+                                    "   XX.....XX    ",
+                                    "    XX.....XX   ",
+                                    "     XX....XX   ",
+                                    "      XX..XX.XX ",
+                                    "       XXXX.XXXX",
+                                    "        XX.XXXX ",
+                                    "          XXXX  ",
+                                    "          XXX   ",
+                                    "           X    "))
 
 COULEUR_FOND = (200, 200, 200)
 
@@ -86,11 +195,11 @@ TAILLE_TITRE_PRINCIPAL = 200
 TITRE_MODE_ACCUEIL = "LOGIMAGE"
 TITRE_MODE_CHOISI_LOGIMAGE = "Choisir un logimage ..."
 
-
 MODE_LOGIMAGE_FAIT = 0
 MODE_LOGIMAGE_CREER = 1
 MODE_LOGIMAGE_RENTRE = 2
 MODE_LOGIMAGE_IMPR = 3
+MODE_LOGIMAGE_CORRECTION = 4
 
 ACTION_SUPR_1 = 0
 ACTION_SUPR_GROUPE = 1
@@ -126,7 +235,6 @@ BOUTON_AFFICHER_CORRECTION = 16
 BOUTON_CRAYON = 17
 BOUTON_EFFACER_TOUT_CRAYON = 18
 BOUTON_POINTEUR = 19
-
 
 STYLE_BOUTON_VERT = ((0, 40, 3), (90, 135, 95), 3, (None, 35))
 STYLE_BOUTON_ROUGE = ((96, 0, 0), (181, 99, 99), 3, (None, 35))
@@ -352,16 +460,22 @@ HAUTEUR_BANDEAU_TITRE_IMPR = 200
 TAILLE_TEXTE_TITRE_IMPR = 180
 MARGE_COTE_IMPR = 10
 TEXTE_NB_ETAPES_IMPR = "Nombre d'étapes : "
-BORNES_CATEGORIES = [200, 300, 400, 600, 700, 900, 1100, 1300, 2000]
+BORNES_CATEGORIES = [200, 300, 400, 600, 700, 900, 1100, 1300, 1500, 2000]
 CATEGORIE_INFAISABLE = -1
 CATEGORIE_IMPOSSIBLE = -2
+CATEGORIE_PNG = -3
 TEXTE_CATEGORIE_IMPOSSIBLE = "Impossibles"
 TEXTE_CATEGORIE_INFAISABLE = "Infaisables"
+TEXTE_CATEGORIE_PNG = "Images PNG"
 
 NOM_DOSSIER_SAUVEGARDE = 'Logimages/'
-# NOM_DOSSIER_SAUVEGARDE = 'Entrees/ImagesReussies/'
+NOM_DOSSIER_ENTREES_PNG = 'Entrees/ImagesPng/'
 NOM_DOSSIER_IMPR = 'ImagesSortie/'
 NOM_FICHIER_SAUVEGARDE = 'derniereSauvegarde.json'
+NOM_DOSSIER_SAUVEGARDE_IMAGES_INF_ERREURS = 'Entrees/ImagesInfaisablesErreurs/'
+NOM_DOSSIER_SAUVEGARDE_IMAGES_INFAISABLES = 'Entrees/ImagesInfaisables/'
+NOM_DOSSIER_SAUVEGARDE_IMAGES_IMPOSSIBLES = 'Entrees/ImagesImpossibles/'
+
 SUPLEMENT_NOM_FICHIER_VIERGE = '-Vierge'
 SUPLEMENT_NOM_FICHIER_CORRECTION = '-Correction'
 

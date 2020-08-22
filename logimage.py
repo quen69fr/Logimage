@@ -1,9 +1,9 @@
 # coding: utf-8
 
 from titre import *
-from fonctions_correction_logimage_mixe_1_2 import *
+from fonctions_correction_logimage import *
 import json
-import copy
+from threading import Thread
 
 PARAM_LOGIMAGE_NOM = "0"
 PARAM_LOGIMAGE_DIMENTIONS = "1"
@@ -48,7 +48,6 @@ def impr_logimage_sauvegarde(titre_sauvegarde_logimage: str):
         cases_correction = dict_logimage[PARAM_LOGIMAGE_CORRIGE]
         cases_vierge = [[False for _ in range(dict_logimage[PARAM_LOGIMAGE_DIMENTIONS][0])]
                         for _ in range(dict_logimage[PARAM_LOGIMAGE_DIMENTIONS][1])]
-
         for cases, suplement_nom, nb_etapes in [(cases_vierge, SUPLEMENT_NOM_FICHIER_VIERGE, None),
                                                 (cases_correction, SUPLEMENT_NOM_FICHIER_CORRECTION,
                                                  dict_logimage[PARAM_LOGIMAGE_NB_ETAPES_ODRI])]:
@@ -61,7 +60,7 @@ def impr_logimage_sauvegarde(titre_sauvegarde_logimage: str):
 
 def create_logimage_nouveau(mode_logimage, dimentions=DEFAULT_TAILLE_GRILLE, titre=None):
     nb_colonnes, nb_lignes = dimentions
-    if mode_logimage == MODE_LOGIMAGE_CREER:
+    if mode_logimage == MODE_LOGIMAGE_CREER or mode_logimage == MODE_LOGIMAGE_IMPR:
         return Logimage([[False for _ in range(nb_colonnes)] for _ in range(nb_lignes)],
                         [[] for _ in range(nb_lignes)], [[] for _ in range(nb_colonnes)], MODE_LOGIMAGE_CREER, None,
                         titre)
@@ -69,6 +68,22 @@ def create_logimage_nouveau(mode_logimage, dimentions=DEFAULT_TAILLE_GRILLE, tit
         return Logimage([[CASE_INCONNUE for _ in range(nb_colonnes)] for _ in range(nb_lignes)],
                         [[] for _ in range(nb_lignes)], [[] for _ in range(nb_colonnes)], MODE_LOGIMAGE_RENTRE, None,
                         titre)
+
+
+def create_logimage_creer_png(chemin_image: str):
+    image = pygame.image.load(f'{NOM_DOSSIER_ENTREES_PNG}{chemin_image}')
+    largeur, hauteur = image.get_size()
+    # logimage = create_logimage_nouveau(MODE_LOGIMAGE_CREER, (largeur, hauteur), chemin_image[:-4])
+
+    cases = [[False for _ in range(largeur)] for _ in range(hauteur)]
+
+    for ligne in range(hauteur):
+        for colonne in range(largeur):
+            if image.get_at((colonne, ligne)) == NOIR:
+                cases[ligne][colonne] = True
+
+    return Logimage(cases, [[] for _ in range(hauteur)], [[] for _ in range(largeur)], MODE_LOGIMAGE_CREER, None,
+                    chemin_image[:-4])
 
 
 class Logimage:
@@ -91,12 +106,19 @@ class Logimage:
         self.nb_colonnes_sequences_ligne = max([len(sequence) for sequence in self.sequences_lignes])
         self.nb_lignes_sequences_colonne = max([len(sequence) for sequence in self.sequences_colonnes])
         if self.mode_logimage == MODE_LOGIMAGE_RENTRE:
+            self.sequences_corrigees = None
             self.nb_colonnes_sequences_ligne += 1
             self.nb_lignes_sequences_colonne += 1
+        elif self.mode_logimage == MODE_LOGIMAGE_CORRECTION:
+            self.ligne_ou_colonne_en_cours = None
+            self.cases_ordonnees_colonnes = []
+            self.update_cases_ordonnees_colonnes()
         if self.mode_logimage == MODE_LOGIMAGE_FAIT:
             self.dic_points_crayon = {}
             self.liste_cases_rayees = []
             self.taille_point_crayon = 0
+        else:
+            self.logimage_correction_progressive = None
 
         self.update_sequences_auto = self.mode_logimage == MODE_LOGIMAGE_CREER
 
@@ -116,7 +138,7 @@ class Logimage:
 
         self.derniere_case_modifiee = None
         self.recadre = True
-        self.cases_affiche_en_attente = []
+        self.cases_affiche_en_attente = {}
 
         self.trouve_erreurs = self.mode_logimage == MODE_LOGIMAGE_FAIT
         if self.trouve_erreurs:
@@ -128,7 +150,11 @@ class Logimage:
             self.update_all_sequences_lignes()
             self.update_all_sequences_colonnes()
 
-        self.update_affichage()
+        if self.mode_logimage == MODE_LOGIMAGE_IMPR:
+            self.update_affichage()
+        else:
+            self.updating_thread = False
+            self.update_affichage_thread()
 
     # -----------------------------------------------------------------
 
@@ -157,7 +183,7 @@ class Logimage:
             return False
         return True
 
-    def corrige_logimage_old(self):
+    def corrige_logimage_old_1(self):
         print_correction(f'Correction de {self.titre.texte} :')
         t0 = time.time()
         potentiellement_impossible = not self.update_sequences_auto
@@ -211,7 +237,7 @@ class Logimage:
                     print_correction(f'ligne {i}:')
                     etape = False
                     try:
-                        liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense(ligne, liste_nbs)
+                        liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense_m1(ligne, liste_nbs)
                     except MemoryError:
                         print_correction('Erreur : trop de possibilités')
                         if i not in lignes_erreur_memoire:
@@ -290,7 +316,7 @@ class Logimage:
                     print_correction(f'colonne {j}:')
                     etape = False
                     try:
-                        liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense(colonne, liste_nbs)
+                        liste_possibilitees = find_toutes_les_possibilitees_d_une_sequense_m1(colonne, liste_nbs)
                     except MemoryError:
                         print_correction('Erreur : trop de possibilités')
                         if j not in colonnes_erreur_memoire:
@@ -355,7 +381,7 @@ class Logimage:
             self.corrige = None
         return True
 
-    def corrige_logimage(self):
+    def corrige_logimage_old_2(self):
         print_correction(f'Correction de {self.titre.texte} :')
         t0 = time.time()
         potentiellement_impossible = not self.update_sequences_auto
@@ -403,7 +429,7 @@ class Logimage:
                         continue
 
                     print_correction(f'___ LIGNE {i} ___')
-                    liste_cases_communes = trouve_cases_communes_intelligent(ligne, liste_nbs)
+                    liste_cases_communes = trouve_cases_communes_intelligent_old(ligne, liste_nbs)
 
                     if liste_cases_communes is None:
                         self.possible = False
@@ -457,7 +483,7 @@ class Logimage:
                         continue
 
                     print_correction(f'___ COLONNE {j} ___')
-                    liste_cases_communes = trouve_cases_communes_intelligent(colonne, liste_nbs)
+                    liste_cases_communes = trouve_cases_communes_intelligent_old(colonne, liste_nbs)
 
                     if liste_cases_communes is None:
                         self.possible = False
@@ -490,14 +516,10 @@ class Logimage:
             self.corrige = cases
             if self.faisable:
                 print_correction('-------- FIN --------')
-                erreur_memoire = False
             else:
                 if erreur_memoire:
-                    self.possible = False
-                    self.faisable = None
-                    self.nb_etapes_ordinateur = None
-                    self.corrige = None
                     print_correction('-------- ERREUR --------')
+                    self.nb_etapes_ordinateur *= -1
                 else:
                     print_correction('----- INFAISABLE -----')
 
@@ -505,13 +527,501 @@ class Logimage:
             self.faisable = None
             self.nb_etapes_ordinateur = None
             self.corrige = None
-            erreur_memoire = False
             print_correction('----- IMPOSSIBLE -----')
 
         print_correction('')
         print_correction(f'Durée totale : {int((time.time() - t0) // 60)} min {round((time.time() - t0) % 60, 2)} sec')
 
-        return not erreur_memoire
+    def corrige_logimage_old_3(self):
+        print_correction(f'Correction de {self.titre.texte} :')
+        t0 = time.time()
+        potentiellement_impossible = not self.update_sequences_auto
+
+        clear_possibilitees_pour_x_sur_n()
+
+        cases = [[CASE_INCONNUE for _ in range(self.nb_colonnes)] for _ in range(self.nb_lignes)]
+        cases_ordonnees_colonnes = [[CASE_INCONNUE for _ in range(self.nb_lignes)] for _ in range(self.nb_colonnes)]
+        erreur_memoire = False
+
+        nb_cases_fixees = 0
+        nb_cases_a_fixees = self.nb_lignes * self.nb_colonnes
+
+        self.possible = self.teste_coherence_sequences()
+
+        self.nb_etapes_ordinateur = 0
+        if self.possible:
+            self.faisable = False
+
+            lignes_colonnes_a_tester = {}
+            for i in range(self.nb_lignes):
+                sequence = self.sequences_lignes[i]
+                if self.nb_colonnes - sum(sequence) - len(sequence) + 1 < max(sequence):
+                    lignes_colonnes_a_tester[(True, i)] = calcul_score_ligne(cases[i], sequence)
+            for j in range(self.nb_colonnes):
+                sequence = self.sequences_colonnes[j]
+                if self.nb_lignes - sum(sequence) - len(sequence) + 1 < max(sequence):
+                    lignes_colonnes_a_tester[(False, j)] = calcul_score_ligne(cases_ordonnees_colonnes[j], sequence)
+            while len(lignes_colonnes_a_tester) > 0:
+                ligne_colonne_min = min(lignes_colonnes_a_tester,
+                                        key=lambda key: lignes_colonnes_a_tester[key][0] * COEF_RENTABILITE_METHODE_1
+                                        if (lignes_colonnes_a_tester[key][1] and
+                                            lignes_colonnes_a_tester[key][0] < SEUIL_MAX_METODE_RECURSIVE_SANS_MEMOIRE)
+                                        else lignes_colonnes_a_tester[key][0])
+                ligne_ou_pas, n = ligne_colonne_min
+                nb_possibilites, methode_1_ou_2 = lignes_colonnes_a_tester[ligne_colonne_min]
+                del lignes_colonnes_a_tester[ligne_colonne_min]
+
+                if ligne_ou_pas:
+                    ligne = cases[n]
+                    liste_nbs = self.sequences_lignes[n]
+                    if CASE_INCONNUE not in ligne:
+                        if potentiellement_impossible:
+                            sequence_ligne = []
+                            n = 0
+                            for case in ligne:
+                                if case:
+                                    n += 1
+                                else:
+                                    if n > 0:
+                                        sequence_ligne.append(n)
+                                        n = 0
+                            if n > 0:
+                                sequence_ligne.append(n)
+                            if not sequence_ligne == liste_nbs:
+                                self.possible = False
+                                break
+                        continue
+
+                    print_correction(f'___ LIGNE {n} ___')
+                    liste_cases_communes = trouve_cases_communes_intelligent(ligne, liste_nbs,
+                                                                             methode_1_ou_2, nb_possibilites)
+
+                    if liste_cases_communes is None:
+                        self.possible = False
+                        break
+                    elif liste_cases_communes == RETURN_ERREUR_MEMOIRE:
+                        erreur_memoire = True
+                    else:
+                        if len(liste_cases_communes) > 0:
+                            self.nb_etapes_ordinateur += 1
+                            for j, valeur in liste_cases_communes:
+                                nb_cases_fixees += 1
+                                print_correction(f'-------> case {n}, {j}   ({nb_cases_fixees}/{nb_cases_a_fixees})')
+                                cases[n][j] = valeur
+                                cases_ordonnees_colonnes[j][n] = valeur
+                                lignes_colonnes_a_tester[(False, j)] = \
+                                    calcul_score_ligne(cases_ordonnees_colonnes[j], self.sequences_colonnes[j])
+                            if nb_cases_fixees >= nb_cases_a_fixees:
+                                self.faisable = True
+                                break
+
+                else:
+                    colonne = cases_ordonnees_colonnes[n]
+                    liste_nbs = self.sequences_colonnes[n]
+                    if CASE_INCONNUE not in colonne:
+                        if potentiellement_impossible:
+                            sequence_colonne = []
+                            n = 0
+                            for case in colonne:
+                                if case:
+                                    n += 1
+                                else:
+                                    if n > 0:
+                                        sequence_colonne.append(n)
+                                        n = 0
+                            if n > 0:
+                                sequence_colonne.append(n)
+                            if not sequence_colonne == liste_nbs:
+                                self.possible = False
+                                break
+                        continue
+
+                    print_correction(f'___ COLONNE {n} ___')
+                    liste_cases_communes = trouve_cases_communes_intelligent(colonne, liste_nbs,
+                                                                             methode_1_ou_2, nb_possibilites)
+
+                    if liste_cases_communes is None:
+                        self.possible = False
+                        break
+                    elif liste_cases_communes == RETURN_ERREUR_MEMOIRE:
+                        erreur_memoire = True
+                    else:
+                        if len(liste_cases_communes) > 0:
+                            self.nb_etapes_ordinateur += 1
+                            for i, valeur in liste_cases_communes:
+                                nb_cases_fixees += 1
+                                print_correction(f'-------> case {i}, {n}   ({nb_cases_fixees}/{nb_cases_a_fixees})')
+                                cases[i][n] = valeur
+                                cases_ordonnees_colonnes[n][i] = valeur
+                                lignes_colonnes_a_tester[(True, i)] = \
+                                    calcul_score_ligne(cases[i], self.sequences_lignes[i])
+                            if nb_cases_fixees >= nb_cases_a_fixees:
+                                self.faisable = True
+                                break
+
+        if self.possible:
+            self.corrige = cases
+            if self.mode_logimage == MODE_LOGIMAGE_RENTRE:
+                self.sequences_corrigees = [copy.deepcopy(self.sequences_lignes),
+                                            copy.deepcopy(self.sequences_colonnes)]
+            if self.faisable:
+                print_correction('-------- FIN --------')
+            else:
+                if erreur_memoire:
+                    print_correction('-------- ERREUR --------')
+                    self.nb_etapes_ordinateur *= -1
+                else:
+                    print_correction('----- INFAISABLE -----')
+
+        else:
+            self.faisable = None
+            self.nb_etapes_ordinateur = None
+            self.corrige = None
+            print_correction('----- IMPOSSIBLE -----')
+
+        print_correction('')
+        print_correction(f'Durée totale : {int((time.time() - t0) // 60)} min {round((time.time() - t0) % 60, 2)} sec')
+
+    def corrige_logimage_affichage_old_4(self):
+        print_correction(f'Correction de {self.titre.texte} :')
+        t0 = time.time()
+        potentiellement_impossible = not self.update_sequences_auto
+
+        clear_possibilitees_pour_x_sur_n()
+
+        self.logimage_correction_progressive = Logimage([[CASE_INCONNUE for _ in range(self.nb_colonnes)]
+                                                         for _ in range(self.nb_lignes)], self.sequences_lignes,
+                                                        self.sequences_colonnes, MODE_LOGIMAGE_CORRECTION, None,
+                                                        f'CORRECTION : {self.titre.texte}', 'Inutile')
+        cases = self.logimage_correction_progressive.cases
+        cases_ordonnees_colonnes = self.logimage_correction_progressive.cases_ordonnees_colonnes
+
+        erreur_memoire = False
+        nb_cases_fixees = 0
+        nb_cases_a_fixees = self.nb_lignes * self.nb_colonnes
+
+        self.possible = self.teste_coherence_sequences()
+
+        self.nb_etapes_ordinateur = 0
+        if self.possible:
+            self.faisable = False
+
+            lignes_colonnes_a_tester = {}
+            for i in range(self.nb_lignes):
+                lignes_colonnes_a_tester[(True, i)] = calcul_score_ligne(cases[i], self.sequences_lignes[i])
+            for j in range(self.nb_colonnes):
+                lignes_colonnes_a_tester[(False, j)] = calcul_score_ligne(cases_ordonnees_colonnes[j],
+                                                                          self.sequences_colonnes[j])
+            while len(lignes_colonnes_a_tester) > 0:
+                self.logimage_correction_progressive.ligne_ou_colonne_en_cours = \
+                    min(lignes_colonnes_a_tester,
+                        key=lambda key: lignes_colonnes_a_tester[key][0] * COEF_RENTABILITE_METHODE_1
+                        if (lignes_colonnes_a_tester[key][1] and
+                            lignes_colonnes_a_tester[key][0] < SEUIL_MAX_METODE_RECURSIVE_SANS_MEMOIRE)
+                        else lignes_colonnes_a_tester[key][0])
+                ligne_ou_pas, n = self.logimage_correction_progressive.ligne_ou_colonne_en_cours
+                nb_possibilites, methode_1_ou_2 = \
+                    lignes_colonnes_a_tester[self.logimage_correction_progressive.ligne_ou_colonne_en_cours]
+                del lignes_colonnes_a_tester[self.logimage_correction_progressive.ligne_ou_colonne_en_cours]
+
+                if ligne_ou_pas:
+                    ligne = cases[n]
+                    liste_nbs = self.sequences_lignes[n]
+                    if CASE_INCONNUE not in ligne:
+                        if potentiellement_impossible:
+                            sequence_ligne = []
+                            n = 0
+                            for case in ligne:
+                                if case:
+                                    n += 1
+                                else:
+                                    if n > 0:
+                                        sequence_ligne.append(n)
+                                        n = 0
+                            if n > 0:
+                                sequence_ligne.append(n)
+                            if not sequence_ligne == liste_nbs:
+                                self.possible = False
+                                break
+                        continue
+
+                    print_correction(f'___ LIGNE {n} ___')
+                    liste_cases_communes = trouve_cases_communes_intelligent(ligne, liste_nbs,
+                                                                             methode_1_ou_2, nb_possibilites)
+
+                    if liste_cases_communes is None:
+                        self.possible = False
+                        break
+                    elif liste_cases_communes == RETURN_ERREUR_MEMOIRE:
+                        erreur_memoire = True
+                    else:
+                        if len(liste_cases_communes) > 0:
+                            self.nb_etapes_ordinateur += 1
+                            for j, valeur in liste_cases_communes:
+                                nb_cases_fixees += 1
+                                print_correction(f'-------> case {n}, {j}   ({nb_cases_fixees}/{nb_cases_a_fixees})')
+                                self.logimage_correction_progressive.set_case_grille(n, j, valeur)
+                                lignes_colonnes_a_tester[(False, j)] = \
+                                    calcul_score_ligne(cases_ordonnees_colonnes[j], self.sequences_colonnes[j])
+                            if nb_cases_fixees >= nb_cases_a_fixees:
+                                self.faisable = True
+                                break
+
+                else:
+                    colonne = cases_ordonnees_colonnes[n]
+                    liste_nbs = self.sequences_colonnes[n]
+                    if CASE_INCONNUE not in colonne:
+                        if potentiellement_impossible:
+                            sequence_colonne = []
+                            n = 0
+                            for case in colonne:
+                                if case:
+                                    n += 1
+                                else:
+                                    if n > 0:
+                                        sequence_colonne.append(n)
+                                        n = 0
+                            if n > 0:
+                                sequence_colonne.append(n)
+                            if not sequence_colonne == liste_nbs:
+                                self.possible = False
+                                break
+                        continue
+
+                    print_correction(f'___ COLONNE {n} ___')
+                    liste_cases_communes = trouve_cases_communes_intelligent(colonne, liste_nbs,
+                                                                             methode_1_ou_2, nb_possibilites)
+
+                    if liste_cases_communes is None:
+                        self.possible = False
+                        break
+                    elif liste_cases_communes == RETURN_ERREUR_MEMOIRE:
+                        erreur_memoire = True
+                    else:
+                        if len(liste_cases_communes) > 0:
+                            self.nb_etapes_ordinateur += 1
+                            for i, valeur in liste_cases_communes:
+                                nb_cases_fixees += 1
+                                print_correction(f'-------> case {i}, {n}   ({nb_cases_fixees}/{nb_cases_a_fixees})')
+                                self.logimage_correction_progressive.set_case_grille(i, n, valeur)
+                                lignes_colonnes_a_tester[(True, i)] = \
+                                    calcul_score_ligne(cases[i], self.sequences_lignes[i])
+                            if nb_cases_fixees >= nb_cases_a_fixees:
+                                self.faisable = True
+                                break
+
+        dossier_sauvegarde = None
+        if self.possible:
+            self.corrige = cases
+            if self.faisable:
+                print_correction('-------- FIN --------')
+            else:
+                if erreur_memoire:
+                    print_correction('-------- ERREUR --------')
+                    self.nb_etapes_ordinateur *= -1
+                    dossier_sauvegarde = NOM_DOSSIER_SAUVEGARDE_IMAGES_INF_ERREURS
+                else:
+                    print_correction('----- INFAISABLE -----')
+                    dossier_sauvegarde = NOM_DOSSIER_SAUVEGARDE_IMAGES_INFAISABLES
+
+        else:
+            self.faisable = None
+            self.nb_etapes_ordinateur = None
+            self.corrige = None
+            print_correction('----- IMPOSSIBLE -----')
+            dossier_sauvegarde = NOM_DOSSIER_SAUVEGARDE_IMAGES_IMPOSSIBLES
+
+        print_correction('')
+        print_correction(f'Durée totale : {int((time.time() - t0) // 60)} min {round((time.time() - t0) % 60, 2)} sec')
+        self.logimage_correction_progressive.ligne_ou_colonne_en_cours = None
+        self.logimage_correction_progressive = None
+        if dossier_sauvegarde is not None:
+            logimage_impr = Logimage(self.corrige, self.sequences_lignes, self.sequences_colonnes, MODE_LOGIMAGE_IMPR,
+                                     COTE_CASE_IMPR, self.titre.texte, self.titre.titre_sauvegarde,
+                                     nb_etapes_ordinateur=self.nb_etapes_ordinateur)
+            logimage_impr.imprime_png('', f'{dossier_sauvegarde}{self.titre.titre_sauvegarde[:-5]}.png')
+
+    def corrige_logimage_affichage(self):
+        print_correction(f'Correction de {self.titre.texte} :')
+        t0 = time.time()
+        potentiellement_impossible = not self.update_sequences_auto
+
+        clear_possibilitees_pour_x_sur_n()
+
+        self.logimage_correction_progressive = Logimage([[CASE_INCONNUE for _ in range(self.nb_colonnes)]
+                                                         for _ in range(self.nb_lignes)], self.sequences_lignes,
+                                                        self.sequences_colonnes, MODE_LOGIMAGE_CORRECTION, None,
+                                                        f'CORRECTION : {self.titre.texte}', 'Inutile')
+        cases = self.logimage_correction_progressive.cases
+        cases_ordonnees_colonnes = self.logimage_correction_progressive.cases_ordonnees_colonnes
+
+        erreur_memoire = False
+        nb_cases_fixees = 0
+        nb_cases_a_fixees = self.nb_lignes * self.nb_colonnes
+
+        self.possible = self.teste_coherence_sequences()
+
+        self.nb_etapes_ordinateur = 0
+        if self.possible:
+            self.faisable = False
+
+            lignes_colonnes_a_tester = {}
+            liste_lignes_colonnes_a_tester_grossierement = []
+            for i in range(self.nb_lignes):
+                lignes_colonnes_a_tester[(True, i)] = calcul_score_ligne(cases[i], self.sequences_lignes[i])
+                liste_lignes_colonnes_a_tester_grossierement.append((True, i))
+            for j in range(self.nb_colonnes):
+                lignes_colonnes_a_tester[(False, j)] = calcul_score_ligne(cases_ordonnees_colonnes[j],
+                                                                          self.sequences_colonnes[j])
+                liste_lignes_colonnes_a_tester_grossierement.append((False, j))
+
+            while len(lignes_colonnes_a_tester) > 0:
+                ligne_ou_pas, n = min(lignes_colonnes_a_tester,
+                                      key=lambda key: lignes_colonnes_a_tester[key][0] * COEF_RENTABILITE_METHODE_1
+                                      if (lignes_colonnes_a_tester[key][1] and
+                                          lignes_colonnes_a_tester[key][0] < SEUIL_MAX_METODE_RECURSIVE_SANS_MEMOIRE)
+                                      else lignes_colonnes_a_tester[key][0])
+                nb_possibilites, methode_1_ou_2 = lignes_colonnes_a_tester[(ligne_ou_pas, n)]
+                if nb_possibilites < SEUIL_RENTABILITE_METHODE_GROSSIERE or \
+                        len(liste_lignes_colonnes_a_tester_grossierement) == 0:
+                    del lignes_colonnes_a_tester[(ligne_ou_pas, n)]
+                    if (ligne_ou_pas, n) in liste_lignes_colonnes_a_tester_grossierement:
+                        liste_lignes_colonnes_a_tester_grossierement.remove((ligne_ou_pas, n))
+                    methode_grossiere = False
+                else:
+                    ligne_ou_pas, n = liste_lignes_colonnes_a_tester_grossierement[0]
+                    del liste_lignes_colonnes_a_tester_grossierement[0]
+                    methode_grossiere = True
+                self.logimage_correction_progressive.ligne_ou_colonne_en_cours = ligne_ou_pas, n
+
+                if ligne_ou_pas:
+                    ligne = cases[n]
+                    liste_nbs = self.sequences_lignes[n]
+                    if CASE_INCONNUE not in ligne:
+                        if potentiellement_impossible:
+                            sequence_ligne = []
+                            n = 0
+                            for case in ligne:
+                                if case:
+                                    n += 1
+                                else:
+                                    if n > 0:
+                                        sequence_ligne.append(n)
+                                        n = 0
+                            if n > 0:
+                                sequence_ligne.append(n)
+                            if not sequence_ligne == liste_nbs:
+                                self.possible = False
+                                break
+                        continue
+
+                    print_correction(f'___ LIGNE {n} ___')
+                    if methode_grossiere:
+                        liste_cases_communes = trouve_cases_communes_grossierement(ligne, liste_nbs)
+                    else:
+                        liste_cases_communes = trouve_cases_communes_intelligent(ligne, liste_nbs,
+                                                                                 methode_1_ou_2, nb_possibilites)
+
+                    if liste_cases_communes is None:
+                        self.possible = False
+                        break
+                    elif liste_cases_communes == RETURN_ERREUR_MEMOIRE:
+                        if not methode_grossiere:
+                            erreur_memoire = True
+                    else:
+                        if len(liste_cases_communes) > 0:
+                            self.nb_etapes_ordinateur += 1
+                            for j, valeur in liste_cases_communes:
+                                nb_cases_fixees += 1
+                                print_correction(f'-------> case {n}, {j}   ({nb_cases_fixees}/{nb_cases_a_fixees})')
+                                self.logimage_correction_progressive.set_case_grille(n, j, valeur)
+                                lignes_colonnes_a_tester[(False, j)] = \
+                                    calcul_score_ligne(cases_ordonnees_colonnes[j], self.sequences_colonnes[j])
+                                if (False, j) not in liste_lignes_colonnes_a_tester_grossierement:
+                                    liste_lignes_colonnes_a_tester_grossierement.append([False, j])
+                            if nb_cases_fixees >= nb_cases_a_fixees:
+                                self.faisable = True
+                                break
+
+                else:
+                    colonne = cases_ordonnees_colonnes[n]
+                    liste_nbs = self.sequences_colonnes[n]
+                    if CASE_INCONNUE not in colonne:
+                        if potentiellement_impossible:
+                            sequence_colonne = []
+                            n = 0
+                            for case in colonne:
+                                if case:
+                                    n += 1
+                                else:
+                                    if n > 0:
+                                        sequence_colonne.append(n)
+                                        n = 0
+                            if n > 0:
+                                sequence_colonne.append(n)
+                            if not sequence_colonne == liste_nbs:
+                                self.possible = False
+                                break
+                        continue
+
+                    print_correction(f'___ COLONNE {n} ___')
+                    if methode_grossiere:
+                        liste_cases_communes = trouve_cases_communes_grossierement(colonne, liste_nbs)
+                    else:
+                        liste_cases_communes = trouve_cases_communes_intelligent(colonne, liste_nbs,
+                                                                                 methode_1_ou_2, nb_possibilites)
+
+                    if liste_cases_communes is None:
+                        self.possible = False
+                        break
+                    elif liste_cases_communes == RETURN_ERREUR_MEMOIRE:
+                        if not methode_grossiere:
+                            erreur_memoire = True
+                    else:
+                        if len(liste_cases_communes) > 0:
+                            self.nb_etapes_ordinateur += 1
+                            for i, valeur in liste_cases_communes:
+                                nb_cases_fixees += 1
+                                print_correction(f'-------> case {i}, {n}   ({nb_cases_fixees}/{nb_cases_a_fixees})')
+                                self.logimage_correction_progressive.set_case_grille(i, n, valeur)
+                                lignes_colonnes_a_tester[(True, i)] = \
+                                    calcul_score_ligne(cases[i], self.sequences_lignes[i])
+                                if (True, i) not in liste_lignes_colonnes_a_tester_grossierement:
+                                    liste_lignes_colonnes_a_tester_grossierement.append((True, i))
+                            if nb_cases_fixees >= nb_cases_a_fixees:
+                                self.faisable = True
+                                break
+
+        dossier_sauvegarde = None
+        if self.possible:
+            self.corrige = cases
+            if self.faisable:
+                print_correction('-------- FIN --------')
+            else:
+                if erreur_memoire:
+                    print_correction('-------- ERREUR --------')
+                    self.nb_etapes_ordinateur *= -1
+                    dossier_sauvegarde = NOM_DOSSIER_SAUVEGARDE_IMAGES_INF_ERREURS
+                else:
+                    print_correction('----- INFAISABLE -----')
+                    dossier_sauvegarde = NOM_DOSSIER_SAUVEGARDE_IMAGES_INFAISABLES
+
+        else:
+            self.faisable = None
+            self.nb_etapes_ordinateur = None
+            self.corrige = None
+            print_correction('----- IMPOSSIBLE -----')
+            dossier_sauvegarde = NOM_DOSSIER_SAUVEGARDE_IMAGES_IMPOSSIBLES
+
+        print_correction('')
+        print_correction(f'Durée totale : {int((time.time() - t0) // 60)} min {round((time.time() - t0) % 60, 2)} sec')
+        self.logimage_correction_progressive.ligne_ou_colonne_en_cours = None
+        self.logimage_correction_progressive = None
+        if dossier_sauvegarde is not None:
+            logimage_impr = Logimage(cases, self.sequences_lignes, self.sequences_colonnes, MODE_LOGIMAGE_IMPR,
+                                     COTE_CASE_IMPR, self.titre.texte, self.titre.titre_sauvegarde,
+                                     nb_etapes_ordinateur=self.nb_etapes_ordinateur)
+            logimage_impr.imprime_png('', dossier_sauvegarde)
 
     def return_dict_logimage(self):
         if self.mode_logimage == MODE_LOGIMAGE_CREER:
@@ -536,21 +1046,12 @@ class Logimage:
         }
 
     def sauvegarde_logimage(self, dossier_sauvegarde=NOM_DOSSIER_SAUVEGARDE):
-        if not self.mode_logimage == MODE_LOGIMAGE_FAIT:
-            try:
-                correction = self.corrige_logimage()
-            except MemoryError:
-                return False
-            else:
-                if not correction:
-                    return False
-
         titre = NOM_FICHIER_SAUVEGARDE if self.mode_logimage == MODE_LOGIMAGE_FAIT else self.titre.titre_sauvegarde
         with open(dossier_sauvegarde + titre, 'w') as sauvegarde_logimage:
             json.dump(self.return_dict_logimage(), sauvegarde_logimage)
         return True
 
-    def imprime_png(self, suplement_nom: str):
+    def imprime_png(self, suplement_nom: str, dossier=NOM_DOSSIER_IMPR):
         largeur = self.largeur_ecran + MARGE_COTE_IMPR * 2
         hauteur = self.hauteur_ecran + MARGE_COTE_IMPR * 2 + HAUTEUR_BANDEAU_TITRE_IMPR
         ecran_total = pygame.Surface((largeur, hauteur))
@@ -565,9 +1066,12 @@ class Logimage:
             affiche_texte(TEXTE_NB_ETAPES_IMPR + str(self.nb_etapes_ordinateur), largeur - 1 - MARGE_COTE_IMPR,
                           MARGE_COTE_IMPR, ecran_total, x_0gauche_1centre_2droite=2)
         pygame.image.save(ecran_total,
-                          f'{NOM_DOSSIER_IMPR}{self.titre.titre_sauvegarde}{suplement_nom}{FORMAT_FICHIER_IMPR}')
+                          f'{dossier}{self.titre.titre_sauvegarde[:-5]}{suplement_nom}{FORMAT_FICHIER_IMPR}')
 
     # -----------------------------------------------------------------
+
+    def update_cases_ordonnees_colonnes(self):
+        self.cases_ordonnees_colonnes = [[ligne[j] for ligne in self.cases] for j in range(self.nb_colonnes)]
 
     def update_all_sequences_lignes(self):
         for ligne in range(self.nb_lignes):
@@ -579,17 +1083,7 @@ class Logimage:
 
     def update_1_sequence_ligne(self, ligne):
         if 0 <= ligne < self.nb_lignes:
-            sequence_ligne = []
-            n = 0
-            for case in self.cases[ligne]:
-                if case:
-                    n += 1
-                else:
-                    if n > 0:
-                        sequence_ligne.append(n)
-                        n = 0
-            if n > 0:
-                sequence_ligne.append(n)
+            sequence_ligne = trouve_sequence_ligne(self.cases[ligne])
             if sequence_ligne == self.sequences_lignes:
                 return False
             if len(self.sequences_lignes[ligne]) == len(sequence_ligne):
@@ -608,18 +1102,7 @@ class Logimage:
 
     def update_1_sequence_colonne(self, colonne):
         if 0 <= colonne < self.nb_colonnes:
-            sequence_colonne = []
-            n = 0
-            for ligne in self.cases:
-                case = ligne[colonne]
-                if case:
-                    n += 1
-                else:
-                    if n > 0:
-                        sequence_colonne.append(n)
-                        n = 0
-            if n > 0:
-                sequence_colonne.append(n)
+            sequence_colonne = trouve_sequence_ligne([ligne[colonne] for ligne in self.cases])
             if sequence_colonne == self.sequences_colonnes:
                 return False
             if len(self.sequences_colonnes[colonne]) == len(sequence_colonne):
@@ -715,19 +1198,26 @@ class Logimage:
             return self.sequences_colonnes[colonne][num]
         return None
 
-    def set_case_grille(self, ligne, colonne, valeur):
+    def set_case_grille_sans_update_erreurs(self, ligne, colonne, valeur):
         old_value = self.get_case_grille(ligne, colonne)
         if not (old_value is None or old_value == valeur):
             self.cases[ligne][colonne] = valeur
+            if self.mode_logimage == MODE_LOGIMAGE_CORRECTION:
+                self.cases_ordonnees_colonnes[colonne][ligne] = valeur
             if self.update_sequences_auto:
                 self.update_1_sequence_ligne(ligne)
                 self.update_1_sequence_colonne(colonne)
             self.pre_affiche_1_case_grille(ligne, colonne)
-            if self.trouve_erreurs:
-                self.update_liste_erreur(ligne, colonne)
             if self.mode_logimage == MODE_LOGIMAGE_FAIT:
                 if (ligne, colonne) in self.dic_points_crayon:
                     del self.dic_points_crayon[(ligne, colonne)]
+            return True
+        return False
+
+    def set_case_grille(self, ligne, colonne, valeur):
+        if self.set_case_grille_sans_update_erreurs(ligne, colonne, valeur):
+            if self.trouve_erreurs:
+                self.update_liste_erreur(ligne, colonne)
             return True
         return False
 
@@ -839,16 +1329,25 @@ class Logimage:
             return True
         return False
 
+    def remet_liste_erreur_a_zero(self):
+        self.liste_erreurs = []
+        self.dernier_cases_sans_erreurs = copy.deepcopy(self.cases)
+
     def mettre_toutes_cases_valeur(self, valeur):
         for ligne in range(self.nb_lignes):
             for colonne in range(self.nb_colonnes):
-                self.set_case_grille(ligne, colonne, valeur)
+                self.set_case_grille_sans_update_erreurs(ligne, colonne, valeur)
+        if valeur == CASE_INCONNUE:
+            self.remet_liste_erreur_a_zero()
+        else:
+            self.update_liste_erreur()
 
     def reprendre_dernier_cases_sans_erreurs(self):
         if self.trouve_erreurs:
             for i, ligne in enumerate(self.dernier_cases_sans_erreurs):
                 for j, case in enumerate(ligne):
-                    self.set_case_grille(i, j, case)
+                    self.set_case_grille_sans_update_erreurs(i, j, case)
+        self.liste_erreurs = []
 
     def update_liste_erreur(self, ligne=None, colonne=None):
         if self.trouve_erreurs:
@@ -861,7 +1360,7 @@ class Logimage:
                             self.liste_erreurs.append((i, j))
             else:
                 case = self.get_case_grille(ligne, colonne)
-                if not case == CASE_INCONNUE and not case == self.corrige[ligne][colonne]:
+                if not (case == CASE_INCONNUE or case == self.corrige[ligne][colonne]):
                     if not (ligne, colonne) in self.liste_erreurs:
                         self.liste_erreurs.append((ligne, colonne))
                 else:
@@ -874,18 +1373,23 @@ class Logimage:
         if self.trouve_erreurs:
             liste_erreurs = self.liste_erreurs[:]
             for ligne, colonne in liste_erreurs:
-                self.set_case_grille(ligne, colonne, self.corrige[ligne][colonne])
+                self.set_case_grille_sans_update_erreurs(ligne, colonne, self.corrige[ligne][colonne])
+        self.remet_liste_erreur_a_zero()
 
     def enleve_erreurs(self):
         if self.trouve_erreurs:
             liste_erreurs = self.liste_erreurs[:]
             for ligne, colonne in liste_erreurs:
-                self.set_case_grille(ligne, colonne, CASE_INCONNUE)
+                self.set_case_grille_sans_update_erreurs(ligne, colonne, CASE_INCONNUE)
+        self.remet_liste_erreur_a_zero()
 
     def tout_corriger(self):
         for i, ligne in enumerate(self.corrige):
             for j, case in enumerate(ligne):
-                self.set_case_grille(i, j, case)
+                self.set_case_grille_sans_update_erreurs(i, j, case)
+        self.remet_liste_erreur_a_zero()
+        self.liste_erreurs = []
+        self.dernier_cases_sans_erreurs = copy.deepcopy(self.cases)
 
     def efface_tout_crayon(self):
         if self.mode_logimage == MODE_LOGIMAGE_FAIT:
@@ -1144,18 +1648,17 @@ class Logimage:
             couleur = COULEUR_CASE_VIDE
             if case == CASE_INCONNUE:
                 if not self.mode_logimage == MODE_LOGIMAGE_RENTRE:
-                    couleur = COULEUR_CASE_INCONNUE_BLEU
+                    if self.mode_logimage == MODE_LOGIMAGE_IMPR or self.mode_logimage == MODE_LOGIMAGE_CORRECTION:
+                        couleur = COULEUR_CASE_INCONNUE_ROUGE
+                    else:
+                        couleur = COULEUR_CASE_INCONNUE_BLEU
             elif case:
                 couleur = COULEUR_CASE_PLEINE
             self.pre_affiche_1_case(ligne, colonne, couleur)
 
     def pre_affiche_1_case(self, i: int, j: int, couleur: tuple, nb: int = None):
-        for n in range(len(self.cases_affiche_en_attente) - 1, -1, -1):
-            i2, j2, couleur2, texte2 = self.cases_affiche_en_attente[n]
-            if i == i2 and j == j2:
-                del self.cases_affiche_en_attente[n]
         texte = None if nb is None else str(nb)
-        self.cases_affiche_en_attente.append((i, j, couleur, texte))
+        self.cases_affiche_en_attente[(i, j)] = couleur, texte
 
     def get_pos_case(self, i: int, j: int):
         return j * self.cote_case + self.x_origine_sur_ecran - self.taille_quadrillage // 2, \
@@ -1187,159 +1690,186 @@ class Logimage:
             affiche_texte(texte, x + largeur // 2, y + hauteur // 2 + 1, ecran, taille=self.taille_texte,
                           couleur=COULEUR_NB, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
 
-    def update_affichage(self):
+    def update_affichage_recadre_si_necessaire(self):
         if self.recadre:
             self.recadre_ecran()
-            self.cases_affiche_en_attente = []
             self.pre_affiche_tout()
             self.recadre = False
 
-        for i, j, couleur, texte in self.cases_affiche_en_attente:
+    def update_affichage_thread(self):
+        self.update_affichage_recadre_si_necessaire()
+        if not self.updating_thread and len(self.cases_affiche_en_attente) > 0:
+            thread_affichage = Thread(target=self.update_affichage)
+            self.updating_thread = True
+            thread_affichage.start()
+
+    def update_affichage(self):
+        self.update_affichage_recadre_si_necessaire()
+        for (i, j), (couleur, texte) in self.cases_affiche_en_attente.items():
             self.affiche_case(i, j, couleur, texte)
-        self.cases_affiche_en_attente = []
+        self.cases_affiche_en_attente = {}
+        self.updating_thread = False
 
     def affiche_actions(self, screen: pygame.Surface, x_souirs: int, y_souris: int):
-        action_logimage_ligne_possible_ = get_action_logimage_ligne_possible()
-        action_logimage_colonne_possible_ = get_action_logimage_colonne_possible()
-        action_test_creation_ = get_action_test_creation()
-        action_colorier_case_ = get_action_colorier_case()
-        action_corriger_logimage_ = get_action_corriger_logimage()
-        action_pointeur_ = get_action_pointeur()
-
-        if action_logimage_ligne_possible_ is not None:
-            if action_logimage_ligne_possible_ == ACTION_ADD_1 or action_logimage_ligne_possible_ == ACTION_ADD_GROUPE:
-                ligne_inter, colonne_inter = self.get_ligne_colonne_intersection_souris(x_souirs, y_souris)
-                if 0 <= ligne_inter <= self.nb_lignes and 0 <= colonne_inter <= self.nb_colonnes:
-                    ecart_y = int(COEF_ECART_TAILLE_TRAI_AJOUT * self.cote_case)
-                    x, y = self.get_pos_case(ligne_inter, 0)
-                    dx = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
-                    affiche_rect_transparent((self.x_ecran + dx, self.y_ecran + y - ecart_y,
-                                              self.largeur_ecran - 2 * dx, ecart_y * 2),
-                                             screen, COULEUR_AJOUT[0], COULEUR_AJOUT[1])
-            else:
-                ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
-                if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
-                    if action_logimage_ligne_possible_ == ACTION_SUPR_1:
-                        x, y = self.get_pos_case(ligne, 0)
-                        dx = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
-                        affiche_rect_transparent((self.x_ecran + dx, self.y_ecran + y, self.largeur_ecran - 2 * dx,
-                                                  self.cote_case - self.taille_quadrillage),
-                                                 screen, COULEUR_SUPPRESSION[0], COULEUR_SUPPRESSION[1])
-                    else:
-                        x, y_min = self.get_pos_case(max(ligne - QUADRILLAGE_PRINCIPALE // 2, 0), 0)
-                        x, y_max = self.get_pos_case(min(ligne - QUADRILLAGE_PRINCIPALE // 2 + QUADRILLAGE_PRINCIPALE,
-                                                         self.nb_lignes), 0)
-                        dx = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
-                        affiche_rect_transparent((self.x_ecran + dx, self.y_ecran + y_min, self.largeur_ecran - 2 * dx,
-                                                  y_max - y_min - self.taille_quadrillage),
-                                                 screen, COULEUR_SUPPRESSION[0], COULEUR_SUPPRESSION[1])
-
-        if action_logimage_colonne_possible_ is not None:
-            if action_logimage_colonne_possible_ == ACTION_ADD_1 or \
-                    action_logimage_colonne_possible_ == ACTION_ADD_GROUPE:
-                ligne_inter, colonne_inter = self.get_ligne_colonne_intersection_souris(x_souirs, y_souris)
-                if 0 <= ligne_inter <= self.nb_lignes and 0 <= colonne_inter <= self.nb_colonnes:
-                    ecart_x = int(COEF_ECART_TAILLE_TRAI_AJOUT * self.cote_case)
-                    x, y = self.get_pos_case(0, colonne_inter)
-                    dy = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
-                    affiche_rect_transparent((self.x_ecran + x - ecart_x, self.y_ecran + dy, ecart_x * 2,
-                                              self.hauteur_ecran - 2 * dy),
-                                             screen, COULEUR_AJOUT[0], COULEUR_AJOUT[1])
-            else:
-                ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
-                if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
-                    if action_logimage_colonne_possible_ == ACTION_SUPR_1:
-                        x, y = self.get_pos_case(0, colonne)
-                        dy = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
-                        affiche_rect_transparent((self.x_ecran + x, self.y_ecran + dy,
-                                                  self.cote_case - self.taille_quadrillage,
-                                                  self.hauteur_ecran - 2 * dy),
-                                                 screen, COULEUR_SUPPRESSION[0], COULEUR_SUPPRESSION[1])
-                    else:
-                        x_min, y = self.get_pos_case(0, max(colonne - QUADRILLAGE_PRINCIPALE // 2, 0))
-                        x_max, y = self.get_pos_case(0, min(colonne - QUADRILLAGE_PRINCIPALE // 2 +
-                                                            QUADRILLAGE_PRINCIPALE, self.nb_colonnes))
-                        dy = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
-                        affiche_rect_transparent((self.x_ecran + x_min, self.y_ecran + dy,
-                                                  x_max - x_min - self.taille_quadrillage,
-                                                  self.hauteur_ecran - 2 * dy),
-                                                 screen, COULEUR_SUPPRESSION[0], COULEUR_SUPPRESSION[1])
-
-        if action_test_creation_:
-            if self.possible:
-                if self.faisable:
-                    affiche_texte(TEXTE_FAISABLE, self.x_ecran + self.largeur_ecran // 2,
-                                  self.y_ecran + self.hauteur_ecran // 2, screen, taille=TAILLE_POLICE_GROSSE_CENTREE,
-                                  couleur=COULEUR_SUCCES, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
-                else:
-                    if self.mode_logimage == MODE_LOGIMAGE_CREER:
-                        for i, ligne in enumerate(self.corrige):
-                            for j, case in enumerate(ligne):
-                                if case == CASE_INCONNUE:
-                                    x, y = self.get_pos_case(i, j)
-                                    cote_case = self.cote_case - self.taille_quadrillage
-                                    affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y, cote_case, cote_case),
-                                                             screen, COULEUR_CASES_ERREUR[0], COULEUR_CASES_ERREUR[1])
-                    else:
-                        affiche_texte(TEXTE_INFAISABLE, self.x_ecran + self.largeur_ecran // 2,
-                                      self.y_ecran + self.hauteur_ecran // 2, screen,
-                                      taille=TAILLE_POLICE_GROSSE_CENTREE,
-                                      couleur=COULEUR_SUCCES, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
-            else:
-                affiche_texte(TEXTE_IMPOSSIBLE, self.x_ecran + self.largeur_ecran // 2,
-                              self.y_ecran + self.hauteur_ecran // 2, screen, taille=TAILLE_POLICE_GROSSE_CENTREE,
-                              couleur=COULEUR_ECHEC, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
-
-        if action_colorier_case_:
-            ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
-            if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
-                x, y = self.get_pos_case(ligne, colonne)
-                affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y,
-                                          self.cote_case - self.taille_quadrillage,
-                                          self.cote_case - self.taille_quadrillage),
-                                         screen, COULEUR_AJOUT[0], COULEUR_AJOUT[1])
-
-        if action_corriger_logimage_:
-            for i, j in self.liste_erreurs:
-                x, y = self.get_pos_case(i, j)
-                cote_case = self.cote_case - self.taille_quadrillage
-                affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y, cote_case, cote_case), screen,
-                                         COULEUR_CASES_ERREUR[0], COULEUR_CASES_ERREUR[1])
-
-        if self.mode_logimage == MODE_LOGIMAGE_FAIT:
-            for pos, nb in self.dic_points_crayon.items():
-                x, y = self.get_pos_case(pos[0], pos[1])
-                demi_cote_case = (self.cote_case - self.taille_quadrillage) // 2
-                if nb == 1:
-                    pygame.draw.circle(screen, COULEUR_POINTS_CRAYON, (self.x_ecran + x + demi_cote_case,
-                                                                       self.y_ecran + y + demi_cote_case),
-                                       self.taille_point_crayon)
-                else:
-                    decalage = int(self.taille_point_crayon * 1.5)
-                    for i in [-1, 1]:
-                        pygame.draw.circle(screen, COULEUR_POINTS_CRAYON,
-                                           (self.x_ecran + x + demi_cote_case + i * decalage,
-                                            self.y_ecran + y + demi_cote_case),
-                                           self.taille_point_crayon)
-
-            for i, j in self.liste_cases_rayees:
-                x, y = self.get_pos_case(i, j)
-                affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y,
-                                          self.cote_case - self.taille_quadrillage,
-                                          self.cote_case - self.taille_quadrillage),
-                                         screen, NOIR, 150)
-
-        if action_pointeur_:
-            ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
-            if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
-                x, y = self.get_pos_case(ligne, colonne)
+        if self.mode_logimage == MODE_LOGIMAGE_CORRECTION:
+            if self.ligne_ou_colonne_en_cours is not None:
+                ligne_ou_pas, n = self.ligne_ou_colonne_en_cours
+                x, y = self.get_pos_case(n, n)
                 d = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
                 cote = self.cote_case - self.taille_quadrillage
-                affiche_rect_transparent((self.x_ecran + d, self.y_ecran + y, self.largeur_ecran - 2 * d, cote),
-                                         screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
-                affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote, self.hauteur_ecran - 2 * d),
-                                         screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+                if ligne_ou_pas:
+                    affiche_rect_transparent((self.x_ecran + d, self.y_ecran + y, self.largeur_ecran - 2 * d, cote),
+                                             screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+                else:
+                    affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote, self.hauteur_ecran - 2 * d),
+                                             screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+        else:
+            action_logimage_ligne_possible_ = get_action_logimage_ligne_possible()
+            action_logimage_colonne_possible_ = get_action_logimage_colonne_possible()
+            action_test_creation_ = get_action_test_creation()
+            action_colorier_case_ = get_action_colorier_case()
+            action_corriger_logimage_ = get_action_corriger_logimage()
+            action_pointeur_ = get_action_pointeur()
+
+            if action_logimage_ligne_possible_ is not None:
+                if action_logimage_ligne_possible_ == ACTION_ADD_1 or \
+                        action_logimage_ligne_possible_ == ACTION_ADD_GROUPE:
+                    ligne_inter, colonne_inter = self.get_ligne_colonne_intersection_souris(x_souirs, y_souris)
+                    if 0 <= ligne_inter <= self.nb_lignes and 0 <= colonne_inter <= self.nb_colonnes:
+                        ecart_y = int(COEF_ECART_TAILLE_TRAI_AJOUT * self.cote_case)
+                        x, y = self.get_pos_case(ligne_inter, 0)
+                        dx = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                        affiche_rect_transparent((self.x_ecran + dx, self.y_ecran + y - ecart_y,
+                                                  self.largeur_ecran - 2 * dx, ecart_y * 2),
+                                                 screen, COULEUR_AJOUT[0], COULEUR_AJOUT[1])
+                else:
+                    ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
+                    if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
+                        if action_logimage_ligne_possible_ == ACTION_SUPR_1:
+                            x, y = self.get_pos_case(ligne, 0)
+                            dx = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                            affiche_rect_transparent((self.x_ecran + dx, self.y_ecran + y, self.largeur_ecran - 2 * dx,
+                                                      self.cote_case - self.taille_quadrillage),
+                                                     screen, COULEUR_SUPPRESSION[0], COULEUR_SUPPRESSION[1])
+                        else:
+                            x, y_min = self.get_pos_case(max(ligne - QUADRILLAGE_PRINCIPALE // 2, 0), 0)
+                            x, y_max = \
+                                self.get_pos_case(min(ligne - QUADRILLAGE_PRINCIPALE // 2 + QUADRILLAGE_PRINCIPALE,
+                                                      self.nb_lignes), 0)
+                            dx = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                            affiche_rect_transparent((self.x_ecran + dx, self.y_ecran + y_min,
+                                                      self.largeur_ecran - 2 * dx,
+                                                      y_max - y_min - self.taille_quadrillage),
+                                                     screen, COULEUR_SUPPRESSION[0], COULEUR_SUPPRESSION[1])
+
+            if action_logimage_colonne_possible_ is not None:
+                if action_logimage_colonne_possible_ == ACTION_ADD_1 or \
+                        action_logimage_colonne_possible_ == ACTION_ADD_GROUPE:
+                    ligne_inter, colonne_inter = self.get_ligne_colonne_intersection_souris(x_souirs, y_souris)
+                    if 0 <= ligne_inter <= self.nb_lignes and 0 <= colonne_inter <= self.nb_colonnes:
+                        ecart_x = int(COEF_ECART_TAILLE_TRAI_AJOUT * self.cote_case)
+                        x, y = self.get_pos_case(0, colonne_inter)
+                        dy = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                        affiche_rect_transparent((self.x_ecran + x - ecart_x, self.y_ecran + dy, ecart_x * 2,
+                                                  self.hauteur_ecran - 2 * dy),
+                                                 screen, COULEUR_AJOUT[0], COULEUR_AJOUT[1])
+                else:
+                    ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
+                    if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
+                        if action_logimage_colonne_possible_ == ACTION_SUPR_1:
+                            x, y = self.get_pos_case(0, colonne)
+                            dy = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                            affiche_rect_transparent((self.x_ecran + x, self.y_ecran + dy,
+                                                      self.cote_case - self.taille_quadrillage,
+                                                      self.hauteur_ecran - 2 * dy),
+                                                     screen, COULEUR_SUPPRESSION[0], COULEUR_SUPPRESSION[1])
+                        else:
+                            x_min, y = self.get_pos_case(0, max(colonne - QUADRILLAGE_PRINCIPALE // 2, 0))
+                            x_max, y = self.get_pos_case(0, min(colonne - QUADRILLAGE_PRINCIPALE // 2 +
+                                                                QUADRILLAGE_PRINCIPALE, self.nb_colonnes))
+                            dy = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                            affiche_rect_transparent((self.x_ecran + x_min, self.y_ecran + dy,
+                                                      x_max - x_min - self.taille_quadrillage,
+                                                      self.hauteur_ecran - 2 * dy),
+                                                     screen, COULEUR_SUPPRESSION[0], COULEUR_SUPPRESSION[1])
+
+            if action_test_creation_:
+                if self.possible:
+                    if self.faisable:
+                        affiche_texte(TEXTE_FAISABLE, self.x_ecran + self.largeur_ecran // 2,
+                                      self.y_ecran + self.hauteur_ecran // 2, screen,
+                                      taille=TAILLE_POLICE_GROSSE_CENTREE, couleur=COULEUR_SUCCES,
+                                      x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
+                    else:
+                        if self.mode_logimage == MODE_LOGIMAGE_CREER:
+                            for i, ligne in enumerate(self.corrige):
+                                for j, case in enumerate(ligne):
+                                    if case == CASE_INCONNUE:
+                                        x, y = self.get_pos_case(i, j)
+                                        cote_case = self.cote_case - self.taille_quadrillage
+                                        affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y, cote_case,
+                                                                  cote_case), screen, COULEUR_CASES_ERREUR[0],
+                                                                 COULEUR_CASES_ERREUR[1])
+                        else:
+                            affiche_texte(TEXTE_INFAISABLE, self.x_ecran + self.largeur_ecran // 2,
+                                          self.y_ecran + self.hauteur_ecran // 2, screen,
+                                          taille=TAILLE_POLICE_GROSSE_CENTREE,
+                                          couleur=COULEUR_SUCCES, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
+                else:
+                    affiche_texte(TEXTE_IMPOSSIBLE, self.x_ecran + self.largeur_ecran // 2,
+                                  self.y_ecran + self.hauteur_ecran // 2, screen, taille=TAILLE_POLICE_GROSSE_CENTREE,
+                                  couleur=COULEUR_ECHEC, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
+
+            if action_colorier_case_:
+                ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
+                if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
+                    x, y = self.get_pos_case(ligne, colonne)
+                    affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y,
+                                              self.cote_case - self.taille_quadrillage,
+                                              self.cote_case - self.taille_quadrillage),
+                                             screen, COULEUR_AJOUT[0], COULEUR_AJOUT[1])
+
+            if action_corriger_logimage_:
+                for i, j in self.liste_erreurs:
+                    x, y = self.get_pos_case(i, j)
+                    cote_case = self.cote_case - self.taille_quadrillage
+                    affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y, cote_case, cote_case), screen,
+                                             COULEUR_CASES_ERREUR[0], COULEUR_CASES_ERREUR[1])
+
+            if self.mode_logimage == MODE_LOGIMAGE_FAIT:
+                for pos, nb in self.dic_points_crayon.items():
+                    x, y = self.get_pos_case(pos[0], pos[1])
+                    demi_cote_case = (self.cote_case - self.taille_quadrillage) // 2
+                    if nb == 1:
+                        pygame.draw.circle(screen, COULEUR_POINTS_CRAYON, (self.x_ecran + x + demi_cote_case,
+                                                                           self.y_ecran + y + demi_cote_case),
+                                           self.taille_point_crayon)
+                    else:
+                        decalage = int(self.taille_point_crayon * 1.5)
+                        for i in [-1, 1]:
+                            pygame.draw.circle(screen, COULEUR_POINTS_CRAYON,
+                                               (self.x_ecran + x + demi_cote_case + i * decalage,
+                                                self.y_ecran + y + demi_cote_case),
+                                               self.taille_point_crayon)
+
+                for i, j in self.liste_cases_rayees:
+                    x, y = self.get_pos_case(i, j)
+                    affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y,
+                                              self.cote_case - self.taille_quadrillage,
+                                              self.cote_case - self.taille_quadrillage),
+                                             screen, NOIR, 150)
+
+            if action_pointeur_:
+                ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
+                if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
+                    x, y = self.get_pos_case(ligne, colonne)
+                    d = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                    cote = self.cote_case - self.taille_quadrillage
+                    affiche_rect_transparent((self.x_ecran + d, self.y_ecran + y, self.largeur_ecran - 2 * d, cote),
+                                             screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+                    affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote, self.hauteur_ecran - 2 * d),
+                                             screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
 
     def affiche(self, screen: pygame.Surface):
-        self.update_affichage()
+        self.update_affichage_thread()
         screen.blit(self.ecran, (self.x_ecran, self.y_ecran))

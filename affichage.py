@@ -157,6 +157,8 @@ class VignetteCategorie(Vignette):
         elif self.categorie == CATEGORIE_INFAISABLE:
             couleur1 = COULEUR_ECHEC
             texte = TEXTE_CATEGORIE_INFAISABLE
+        elif self.categorie == CATEGORIE_PNG:
+            texte = TEXTE_CATEGORIE_PNG
         elif self.categorie[1] == math.inf:
             texte = f'+ de {self.categorie[0]}'
         elif self.categorie[0] == 0:
@@ -224,5 +226,35 @@ class VignetteLogimage(Vignette):
             affiche_texte(f'{dimention[0]}x{dimention[1]}', centre_x, hauteur - marge, ecran, police,
                           int(taille * 0.9), COULEUR_SECONDAIRE_VIGNETTE, x_0gauche_1centre_2droite=1,
                           y_0haut_1centre_2bas=2)
+
+        Vignette.__init__(self, rect, ecran)
+
+
+class VignettePng(Vignette):
+    def __init__(self, rect: tuple, titre: str, dimention: tuple):
+        self.nom = titre
+        x, y, largeur, hauteur = rect
+        ecran = pygame.Surface((largeur, hauteur))
+        couleur1, couleur2, marge, texte = STYLE_VIGNETTE_LOGIMAGE
+        marge = max(1, int(largeur * marge))
+        police, taille = texte
+        taille *= largeur
+        centre_x = largeur // 2
+        decalage_y = 0
+
+        ecran.fill(couleur1)
+        pygame.draw.rect(ecran, couleur2, (marge, marge, largeur - 2 * marge, hauteur - 2 * marge))
+
+        if len(titre) >= 11:
+            coef_titre = (9 / len(titre)) ** 0.8
+        else:
+            coef_titre = 1
+        affiche_texte(titre, centre_x, hauteur // 2 - decalage_y, ecran, police,
+                      int(taille * 1.2 * coef_titre), couleur1, x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
+        affiche_texte(TEXTE_CATEGORIE_PNG, centre_x, marge * 2, ecran, police, int(taille * 0.6), COULEUR_SUCCES,
+                      x_0gauche_1centre_2droite=1)
+        affiche_texte(f'{dimention[0]}x{dimention[1]}', centre_x, hauteur - marge, ecran, police,
+                      int(taille * 0.9), COULEUR_SECONDAIRE_VIGNETTE, x_0gauche_1centre_2droite=1,
+                      y_0haut_1centre_2bas=2)
 
         Vignette.__init__(self, rect, ecran)
