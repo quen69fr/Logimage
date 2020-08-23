@@ -11,8 +11,8 @@ SEUIL_RENTABILITE_METHODE_GROSSIERE = 1000
 DEGRES_X_MAX_METHODE_2_CORRECTION_LOGIMAGE = 50, 50
 RETURN_ERREUR_MEMOIRE = 'erreur'
 SAUVEGARDE_CASES_SI_CORRECTION_PAS_COMPLETE = True
-PRINT_CORRECTION = True
-AFFICHE_DETAILS_METHODE_GROSSIERE = True
+PRINT_CORRECTION = False
+AFFICHE_DETAILS_METHODE_GROSSIERE = False
 
 
 def print_correction(string: str):
@@ -82,6 +82,22 @@ CAPTION = 'Logimages (Quentin PALAZON)'
 #                   "    X.......X   ",
 #                   "     X......X   ",
 #                   "     XXXXXXXX   ",)
+# SOURIS_COLORIER_CLIC = ((16, 16), (7, 7), ("       .        ",
+#                                            "      .X.       ",
+#                                            "     .XXX.      ",
+#                                            "    .XXXXX.     ",
+#                                            "   .XXX XXX.    ",
+#                                            "  .XXX   XXX.   ",
+#                                            " .XXX     XXX.  ",
+#                                            ".XXX       XXX. ",
+#                                            " .XXX     XXX.  ",
+#                                            "  .XXX   XXX.   ",
+#                                            "   .XXX XXX.    ",
+#                                            "    .XXXXX.     ",
+#                                            "     .XXX.      ",
+#                                            "      .X.       ",
+#                                            "       .        ",
+#                                            "                "))
 
 SOURIS_NORMALE = ((32, 32), (11, 1), ("          XXXX                  ",
                                       "         XXXXXX                 ",
@@ -115,6 +131,38 @@ SOURIS_NORMALE = ((32, 32), (11, 1), ("          XXXX                  ",
                                       "          XX............XX      ",
                                       "          XXXXXXXXXXXXXXXX      ",
                                       "           XXXXXXXXXXXXXX       "))
+SOURIS_NORMALE_CLIC = ((32, 32), (11, 1), ("                                ",
+                                           "                                ",
+                                           "                                ",
+                                           "          XXXX                  ",
+                                           "         XXXXXX                 ",
+                                           "        XXX..XXX                ",
+                                           "        XX....XX                ",
+                                           "        XX.XX.XX                ",
+                                           "        XX....XXXXXXXXXX        ",
+                                           "        XX....XXXXXXXXXXX       ",
+                                           "        XX....XX....XX.XXXXX    ",
+                                           "        XX....XX....XX..XXXXX   ",
+                                           "  XXXX  XX....XX....XX..XX.XXX  ",
+                                           " XXXXXX XX....XX....XX..XX..XX  ",
+                                           "XXX..XXXXX....XX....XX......XX  ",
+                                           "XX....XXXX..................XX  ",
+                                           "XX......XX..................XX  ",
+                                           "XX......XX..................XX  ",
+                                           "XXXX..........XX..XX..XX....XX  ",
+                                           " XXXX.........XX..XX..XX....XX  ",
+                                           "   XXX........XX..XX..XX...XXX  ",
+                                           "    XX........XX..XX..XX...XX   ",
+                                           "    XXX.......XX..XX..XX..XXX   ",
+                                           "     XX.......XX..XX..XX..XX    ",
+                                           "     XXX......XX..XX..XX..XX    ",
+                                           "      XXX.....XX..XX.....XXX    ",
+                                           "       XXX...............XX     ",
+                                           "        XXX.............XX      ",
+                                           "         XXX............XX      ",
+                                           "          XX............XX      ",
+                                           "          XXXXXXXXXXXXXXXX      ",
+                                           "           XXXXXXXXXXXXXX       "))
 SOURIS_COLORIER = ((16, 16), (0, 0), ("...             ",
                                       ".XX..           ",
                                       ".XXXX..         ",
@@ -147,6 +195,22 @@ SOURIS_DESSIN = ((16, 16), (0, 0), ("XXXX            ",
                                     "          XXXX  ",
                                     "          XXX   ",
                                     "           X    "))
+SOURIS_GOMME = ((16, 16), (1, 1), ("   XXX          ",
+                                   "  XX.XX         ",
+                                   " XX...XX        ",
+                                   "XX.....XX       ",
+                                   "X.......XX      ",
+                                   "XX.....X.XX     ",
+                                   " XX...X...XX    ",
+                                   "  XX.X...XXXX   ",
+                                   "   XX...XXXXXX  ",
+                                   "    XX.XXXXXXXX ",
+                                   "     XXXXXXXXXXX",
+                                   "      XXXXXXXXXX",
+                                   "       XXXXXXXX ",
+                                   "        XXXXXX  ",
+                                   "         XXXX   ",
+                                   "          XX    "))
 
 COULEUR_FOND = (200, 200, 200)
 
@@ -178,7 +242,9 @@ QUADRILLAGE_PRINCIPALE = 5
 COEF_TAILLE_POLICE = 1.2
 COULEUR_NB = NOIR
 COEF_TAILLE_POINTS_CRAYON = 0.1
-COULEUR_POINTS_CRAYON = (5, 5, 50)
+COULEUR_POINTS_CRAYON_CASE_INCONNUE = (5, 5, 50)
+COULEUR_POINTS_CRAYON_CASE_PLEINE = (66, 79, 127)
+COULEUR_POINTS_CRAYON_CASE_VIDE = (38, 46, 73)
 COULEUR_POINTEUR = (NOIR, 90)
 
 CASE_INCONNUE = "?"

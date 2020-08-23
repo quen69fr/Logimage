@@ -48,14 +48,21 @@ class Fenetre:
 
         self.mode_logimage = None
 
-    def update_souris(self):
+    def update_souris(self, clic=None):
         if self.mode == MODE_LOGIMAGE and self.souirs_sur_logimage:
             if get_action_logimage_mode_crayon():
-                set_curseur(SOURIS_DESSIN)
+                if clic == -1:
+                    set_curseur(SOURIS_GOMME)
+                elif clic == 0 or clic is None:
+                    set_curseur(SOURIS_DESSIN)
             else:
-                set_curseur(SOURIS_COLORIER)
+                if clic is None:
+                    set_curseur(SOURIS_COLORIER)
         else:
-            set_curseur(SOURIS_NORMALE)
+            if clic is None or clic == 0:
+                set_curseur(SOURIS_NORMALE)
+            else:
+                set_curseur(SOURIS_NORMALE_CLIC)
 
     def update_screen(self):
         if self.full_screen:
@@ -74,10 +81,10 @@ class Fenetre:
     def new_logimage(self, logimage: Logimage):
         self.logimage = logimage
         self.mode = MODE_LOGIMAGE
+        reset_variables_globales()
         if not self.souirs_sur_logimage == self.logimage.test_souris_sur_ecran(self.x_souris, self.y_souris):
             self.souirs_sur_logimage = not self.souirs_sur_logimage
-            self.update_souris()
-        reset_variables_globales()
+        self.update_souris()
         self.mode_correction_logimage = False
         self.logimage_a_sauvegarder = False
 
@@ -309,6 +316,7 @@ class Fenetre:
                                     break
 
             elif event.type == pygame.MOUSEBUTTONUP:
+                self.update_souris(0)
                 self.mouse_button_down = False
                 if self.mode == MODE_ACCUEIL:
                     if self.bouton_full_screen.clic(self.x_souris, self.y_souris):
@@ -361,6 +369,7 @@ class Fenetre:
 
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 sens = -1 if (event.button == 3 or event.button == 5) else 1
+                self.update_souris(sens)
                 self.mouse_button_down = sens
                 if self.mode == MODE_LOGIMAGE and (event.button == 4 or event.button == 5):
                     self.logimage.gere_clic_down(self.x_souris, self.y_souris, sens)

@@ -1208,9 +1208,9 @@ class Logimage:
                 self.update_1_sequence_ligne(ligne)
                 self.update_1_sequence_colonne(colonne)
             self.pre_affiche_1_case_grille(ligne, colonne)
-            if self.mode_logimage == MODE_LOGIMAGE_FAIT:
-                if (ligne, colonne) in self.dic_points_crayon:
-                    del self.dic_points_crayon[(ligne, colonne)]
+            # if self.mode_logimage == MODE_LOGIMAGE_FAIT:
+            #     if (ligne, colonne) in self.dic_points_crayon:
+            #         del self.dic_points_crayon[(ligne, colonne)]
             return True
         return False
 
@@ -1530,18 +1530,18 @@ class Logimage:
             self.set_case_grille(ligne, colonne, not self.get_case_grille(ligne, colonne))
         elif self.mode_logimage == MODE_LOGIMAGE_FAIT:
             if get_action_logimage_mode_crayon():
-                if self.get_case_grille(ligne, colonne) == CASE_INCONNUE:
-                    if (ligne, colonne) in self.dic_points_crayon:
-                        if sens == 1:
-                            if self.dic_points_crayon[(ligne, colonne)] == 1:
-                                self.dic_points_crayon[(ligne, colonne)] = 2
-                            else:
-                                del self.dic_points_crayon[(ligne, colonne)]
+                # if self.get_case_grille(ligne, colonne) == CASE_INCONNUE:
+                if (ligne, colonne) in self.dic_points_crayon:
+                    if sens == 1:
+                        if self.dic_points_crayon[(ligne, colonne)] == 1:
+                            self.dic_points_crayon[(ligne, colonne)] = 2
                         else:
                             del self.dic_points_crayon[(ligne, colonne)]
                     else:
-                        if sens == 1:
-                            self.dic_points_crayon[(ligne, colonne)] = 1
+                        del self.dic_points_crayon[(ligne, colonne)]
+                else:
+                    if sens == 1:
+                        self.dic_points_crayon[(ligne, colonne)] = 1
             else:
                 index = LISTE_ORDRE_VALEUR_CASE_CLIC.index(self.get_case_grille(ligne, colonne)) - 1
                 if sens == 1:
@@ -1846,14 +1846,21 @@ class Logimage:
                 for pos, nb in self.dic_points_crayon.items():
                     x, y = self.get_pos_case(pos[0], pos[1])
                     demi_cote_case = (self.cote_case - self.taille_quadrillage) // 2
+                    case = self.get_case_grille(pos[0], pos[1])
+                    if case == CASE_INCONNUE:
+                        couleur_points_crayon = COULEUR_POINTS_CRAYON_CASE_INCONNUE
+                    elif case:
+                        couleur_points_crayon = COULEUR_POINTS_CRAYON_CASE_PLEINE
+                    else:
+                        couleur_points_crayon = COULEUR_POINTS_CRAYON_CASE_VIDE
                     if nb == 1:
-                        pygame.draw.circle(screen, COULEUR_POINTS_CRAYON, (self.x_ecran + x + demi_cote_case,
+                        pygame.draw.circle(screen, couleur_points_crayon, (self.x_ecran + x + demi_cote_case,
                                                                            self.y_ecran + y + demi_cote_case),
                                            self.taille_point_crayon)
                     else:
-                        decalage = int(self.taille_point_crayon * 1.5)
+                        decalage = int(self.cote_case * 0.15)
                         for i in [-1, 1]:
-                            pygame.draw.circle(screen, COULEUR_POINTS_CRAYON,
+                            pygame.draw.circle(screen, couleur_points_crayon,
                                                (self.x_ecran + x + demi_cote_case + i * decalage,
                                                 self.y_ecran + y + demi_cote_case),
                                                self.taille_point_crayon)
