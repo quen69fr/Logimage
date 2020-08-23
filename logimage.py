@@ -1435,6 +1435,12 @@ class Logimage:
             pygame.draw.rect(self.ecran, BLANC, (0, 0, self.cote_case * self.nb_colonnes_sequences_ligne,
                                                  self.cote_case * self.nb_lignes_sequences_colonne))
 
+    def test_souris_sur_ecran(self, x_souris, y_souris):
+        if self.x_ecran <= x_souris <= self.x_ecran + self.largeur_ecran and \
+                self.y_ecran <= y_souris <= self.y_ecran + self.hauteur_ecran:
+            return True
+        return False
+
     def get_ligne_colonne_souris(self, x_souris, y_souris):
         return (y_souris - self.y_ecran - self.y_origine_sur_ecran) // self.cote_case, \
                (x_souris - self.x_ecran - self.x_origine_sur_ecran) // self.cote_case
@@ -1472,8 +1478,7 @@ class Logimage:
 
         if action_logimage_ligne_possible_ is None and action_logimage_colonne_possible_ is None and \
                 not get_action_colorier_case():
-            if self.x_ecran <= x_souris <= self.x_ecran + self.largeur_ecran and \
-                    self.y_ecran <= y_souris <= self.y_ecran + self.hauteur_ecran:
+            if self.test_souris_sur_ecran(x_souris, y_souris):
                 i, j = self.get_ligne_colonne_souris(x_souris, y_souris)
                 if not (i, j) == self.derniere_case_modifiee:
                     self.derniere_case_modifiee = (i, j)
@@ -1692,6 +1697,7 @@ class Logimage:
 
     def update_affichage_recadre_si_necessaire(self):
         if self.recadre:
+            self.cases_affiche_en_attente = {}
             self.recadre_ecran()
             self.pre_affiche_tout()
             self.recadre = False
@@ -1705,9 +1711,9 @@ class Logimage:
 
     def update_affichage(self):
         self.update_affichage_recadre_si_necessaire()
-        for (i, j), (couleur, texte) in self.cases_affiche_en_attente.items():
+        while len(self.cases_affiche_en_attente) > 0:
+            (i, j), (couleur, texte) = self.cases_affiche_en_attente.popitem()
             self.affiche_case(i, j, couleur, texte)
-        self.cases_affiche_en_attente = {}
         self.updating_thread = False
 
     def affiche_actions(self, screen: pygame.Surface, x_souirs: int, y_souris: int):

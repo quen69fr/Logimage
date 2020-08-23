@@ -19,7 +19,8 @@ class Fenetre:
         self.mouse_button_down = False
 
         self.mode = MODE_ACCUEIL
-        set_curseur(SOURIS_NORMALE)
+        self.souirs_sur_logimage = False
+        self.update_souris()
 
         init_grille_derges()
         self.logimage = None
@@ -47,6 +48,15 @@ class Fenetre:
 
         self.mode_logimage = None
 
+    def update_souris(self):
+        if self.mode == MODE_LOGIMAGE and self.souirs_sur_logimage:
+            if get_action_logimage_mode_crayon():
+                set_curseur(SOURIS_DESSIN)
+            else:
+                set_curseur(SOURIS_COLORIER)
+        else:
+            set_curseur(SOURIS_NORMALE)
+
     def update_screen(self):
         if self.full_screen:
             if self.mode_correction_logimage:
@@ -63,9 +73,11 @@ class Fenetre:
 
     def new_logimage(self, logimage: Logimage):
         self.logimage = logimage
-        reset_variables_globales()
         self.mode = MODE_LOGIMAGE
-        set_curseur(SOURIS_COLORIER)
+        if not self.souirs_sur_logimage == self.logimage.test_souris_sur_ecran(self.x_souris, self.y_souris):
+            self.souirs_sur_logimage = not self.souirs_sur_logimage
+            self.update_souris()
+        reset_variables_globales()
         self.mode_correction_logimage = False
         self.logimage_a_sauvegarder = False
 
@@ -245,13 +257,10 @@ class Fenetre:
                 self.logimage.efface_cases_rayees()
             elif bouton.type == BOUTON_COLORIER_UNE_CASE:
                 set_action_logimage_mode_crayon(False)
-                set_curseur(SOURIS_COLORIER)
+                self.update_souris()
             elif bouton.type == BOUTON_CRAYON:
                 set_action_colorier_case(False)
-                if get_action_logimage_mode_crayon():
-                    set_curseur(SOURIS_DESSIN)
-                else:
-                    set_curseur(SOURIS_COLORIER)
+                self.update_souris()
             elif bouton.type == BOUTON_EFFACER_TOUT_CRAYON:
                 set_action_colorier_case(False)
                 self.logimage.efface_tout_crayon()
@@ -291,7 +300,7 @@ class Fenetre:
                     else:
                         if self.bouton_revenir_accueil.gere_clavier(event):
                             self.mode = MODE_ACCUEIL
-                            set_curseur(SOURIS_NORMALE)
+                            self.update_souris()
                             continue
                         if self.mode == MODE_LOGIMAGE:
                             for bouton in self.liste_boutons_logimage:
@@ -335,7 +344,7 @@ class Fenetre:
                     elif not self.mode_correction_logimage:
                         if self.bouton_revenir_accueil.clic(self.x_souris, self.y_souris):
                             self.mode = MODE_ACCUEIL
-                            set_curseur(SOURIS_NORMALE)
+                            self.update_souris()
                             break
                         sens = -1 if (event.button == 3 or event.button == 5) else 1
                         if self.mode_logimage in [MODE_LOGIMAGE_CREER, MODE_LOGIMAGE_RENTRE]:
@@ -358,6 +367,11 @@ class Fenetre:
 
             elif event.type == pygame.MOUSEMOTION:
                 self.x_souris, self.y_souris = pygame.mouse.get_pos()
+                if self.mode == MODE_LOGIMAGE and \
+                        not self.souirs_sur_logimage == self.logimage.test_souris_sur_ecran(self.x_souris,
+                                                                                            self.y_souris):
+                    self.souirs_sur_logimage = not self.souirs_sur_logimage
+                    self.update_souris()
 
         if self.mouse_button_down:
             if self.mode == MODE_LOGIMAGE:

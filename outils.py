@@ -82,6 +82,7 @@ CAPTION = 'Logimages (Quentin PALAZON)'
 #                   "    X.......X   ",
 #                   "     X......X   ",
 #                   "     XXXXXXXX   ",)
+
 SOURIS_NORMALE = ((32, 32), (11, 1), ("          XXXX                  ",
                                       "         XXXXXX                 ",
                                       "        XXX..XXX                ",
@@ -460,7 +461,8 @@ HAUTEUR_BANDEAU_TITRE_IMPR = 200
 TAILLE_TEXTE_TITRE_IMPR = 180
 MARGE_COTE_IMPR = 10
 TEXTE_NB_ETAPES_IMPR = "Nombre d'étapes : "
-BORNES_CATEGORIES = [200, 300, 400, 600, 700, 900, 1100, 1300, 1500, 2000]
+# BORNES_CATEGORIES = [200, 300, 400, 600, 700, 900, 1100, 1300, 1500, 2000]
+BORNES_CATEGORIES = [200, 300, 400, 600, 700, 900, 1000, 1200, 1300, 1500, 1500, 1800, 2500]
 CATEGORIE_INFAISABLE = -1
 CATEGORIE_IMPOSSIBLE = -2
 CATEGORIE_PNG = -3
