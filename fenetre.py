@@ -46,6 +46,8 @@ class Fenetre:
         self.liste_vignettes_choisi_logimage = []
         self.categorie_vignettes = None
 
+        self.chargement = False
+
         self.mode_logimage = None
 
     def update_souris(self, clic=None):
@@ -128,6 +130,11 @@ class Fenetre:
 
     def mode_choisi_logimage(self):
         self.mode = MODE_CHOISI_LOGIMAGE
+        self.chargement = True
+        choisi_logimage_thread = Thread(target=self.mode_choisi_logimage_thread)
+        choisi_logimage_thread.start()
+
+    def mode_choisi_logimage_thread(self):
         liste_vignettes = []
         if self.mode_logimage == MODE_LOGIMAGE_CREER and self.categorie_vignettes == CATEGORIE_PNG:
             for nom_image in os.listdir(NOM_DOSSIER_ENTREES_PNG):
@@ -196,6 +203,7 @@ class Fenetre:
 
         if len(liste_vignettes) == 0:
             self.mode = MODE_ACCUEIL
+            self.chargement = False
             return
 
         nb_vignettes = len(liste_vignettes)
@@ -222,7 +230,9 @@ class Fenetre:
                 self.liste_vignettes_choisi_logimage.append(vignettes)
                 i += 1
                 if i >= nb_vignettes:
+                    self.chargement = False
                     return
+        self.chargement = False
 
     def fait_actions_boutons(self, bouton):
         if self.mode == MODE_ACCUEIL:
@@ -255,15 +265,20 @@ class Fenetre:
             elif bouton.type == BOUTON_RETOUR_SANS_ERREUR:
                 self.logimage.reprendre_dernier_cases_sans_erreurs()
                 self.logimage.efface_cases_rayees()
-            elif bouton.type == BOUTON_CORRIGER_ERREURS_LOGIMAGE:
-                self.logimage.corrige_erreurs()
+                self.logimage.stop_aide()
+            elif bouton.type == BOUTON_AIDE:
+                self.logimage.gere_aide()
+                set_action_colorier_case(False)
             elif bouton.type == BOUTON_ENLEVE_ERREURS_LOGIMAGE:
                 self.logimage.enleve_erreurs()
+                self.logimage.stop_aide()
             elif bouton.type == BOUTON_AFFICHER_CORRECTION:
                 self.logimage.tout_corriger()
                 self.logimage.efface_cases_rayees()
+                self.logimage.stop_aide()
             elif bouton.type == BOUTON_COLORIER_UNE_CASE:
                 set_action_logimage_mode_crayon(False)
+                self.logimage.stop_aide()
                 self.update_souris()
             elif bouton.type == BOUTON_CRAYON:
                 set_action_colorier_case(False)
@@ -271,6 +286,9 @@ class Fenetre:
             elif bouton.type == BOUTON_EFFACER_TOUT_CRAYON:
                 set_action_colorier_case(False)
                 self.logimage.efface_tout_crayon()
+            elif bouton.type == BOUTON_CORRIGER_LOGIMAGE:
+                if not type(self.logimage.aide) == tuple:
+                    self.logimage.stop_aide()
 
     def gere_eventements(self):
         for event in pygame.event.get():
@@ -315,65 +333,6 @@ class Fenetre:
                                     self.fait_actions_boutons(bouton)
                                     break
 
-            elif event.type == pygame.MOUSEBUTTONUP:
-                self.update_souris(0)
-                self.mouse_button_down = False
-                if self.mode == MODE_ACCUEIL:
-                    if self.bouton_full_screen.clic(self.x_souris, self.y_souris):
-                        self.full_screen = not self.full_screen
-                        self.update_screen()
-                    for bouton in self.boutons_accueil:
-                        if bouton.clic(self.x_souris, self.y_souris):
-                            self.fait_actions_boutons(bouton)
-                else:
-                    if self.mode == MODE_CHOISI_LOGIMAGE:
-                        if self.bouton_revenir_accueil.clic(self.x_souris, self.y_souris):
-                            self.mode = MODE_ACCUEIL
-                            break
-                        for vignette in self.liste_vignettes_choisi_logimage:
-                            if vignette.clic(self.x_souris, self.y_souris):
-                                if isinstance(vignette, VignetteCategorie):
-                                    self.categorie_vignettes = vignette.categorie
-                                    self.mode_choisi_logimage()
-                                else:
-                                    if self.mode_logimage == MODE_LOGIMAGE_IMPR:
-                                        sauvegarde_thread = Thread(target=impr_logimage_sauvegarde, args=[vignette.nom])
-                                        sauvegarde_thread.start()
-                                    else:
-                                        if isinstance(vignette, VignetteLogimage):
-                                            if vignette.nom == NOM_NOUVEAU_LOGIMAGE:
-                                                self.new_logimage(create_logimage_nouveau(self.mode_logimage))
-                                            else:
-                                                self.new_logimage(create_logimage_sauvegarde(vignette.nom,
-                                                                                             self.mode_logimage))
-                                        else:
-                                            self.new_logimage(create_logimage_creer_png(vignette.nom))
-                                break
-                    elif not self.mode_correction_logimage:
-                        if self.bouton_revenir_accueil.clic(self.x_souris, self.y_souris):
-                            self.mode = MODE_ACCUEIL
-                            self.update_souris()
-                            break
-                        sens = -1 if (event.button == 3 or event.button == 5) else 1
-                        if self.mode_logimage in [MODE_LOGIMAGE_CREER, MODE_LOGIMAGE_RENTRE]:
-                            self.logimage.titre.gere_clic(self.x_souris, self.y_souris)
-                        self.logimage.gere_clic_up(self.x_souris, self.y_souris, sens)
-
-                        if sens == 1:
-                            for bouton in self.liste_boutons_logimage:
-                                if bouton.clic(self.x_souris, self.y_souris):
-                                    self.fait_actions_boutons(bouton)
-                                    break
-                        else:
-                            set_action_test_creation(False)
-
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                sens = -1 if (event.button == 3 or event.button == 5) else 1
-                self.update_souris(sens)
-                self.mouse_button_down = sens
-                if self.mode == MODE_LOGIMAGE and (event.button == 4 or event.button == 5):
-                    self.logimage.gere_clic_down(self.x_souris, self.y_souris, sens)
-
             elif event.type == pygame.MOUSEMOTION:
                 self.x_souris, self.y_souris = pygame.mouse.get_pos()
                 if self.mode == MODE_LOGIMAGE and \
@@ -381,6 +340,67 @@ class Fenetre:
                                                                                             self.y_souris):
                     self.souirs_sur_logimage = not self.souirs_sur_logimage
                     self.update_souris()
+
+            elif not self.mode_correction_logimage and not self.chargement:
+                if event.type == pygame.MOUSEBUTTONUP:
+                    self.update_souris(0)
+                    self.mouse_button_down = False
+                    if self.mode == MODE_ACCUEIL:
+                        if self.bouton_full_screen.clic(self.x_souris, self.y_souris):
+                            self.full_screen = not self.full_screen
+                            self.update_screen()
+                        for bouton in self.boutons_accueil:
+                            if bouton.clic(self.x_souris, self.y_souris):
+                                self.fait_actions_boutons(bouton)
+                    else:
+                        if self.mode == MODE_CHOISI_LOGIMAGE:
+                            if self.bouton_revenir_accueil.clic(self.x_souris, self.y_souris):
+                                self.mode = MODE_ACCUEIL
+                                break
+                            for vignette in self.liste_vignettes_choisi_logimage:
+                                if vignette.clic(self.x_souris, self.y_souris):
+                                    if isinstance(vignette, VignetteCategorie):
+                                        self.categorie_vignettes = vignette.categorie
+                                        self.mode_choisi_logimage()
+                                    else:
+                                        if self.mode_logimage == MODE_LOGIMAGE_IMPR:
+                                            sauvegarde_thread = Thread(target=impr_logimage_sauvegarde,
+                                                                       args=[vignette.nom])
+                                            sauvegarde_thread.start()
+                                        else:
+                                            if isinstance(vignette, VignetteLogimage):
+                                                if vignette.nom == NOM_NOUVEAU_LOGIMAGE:
+                                                    self.new_logimage(create_logimage_nouveau(self.mode_logimage))
+                                                else:
+                                                    self.new_logimage(create_logimage_sauvegarde(vignette.nom,
+                                                                                                 self.mode_logimage))
+                                            else:
+                                                self.new_logimage(create_logimage_creer_png(vignette.nom))
+                                    break
+                        elif not self.mode_correction_logimage:
+                            if self.bouton_revenir_accueil.clic(self.x_souris, self.y_souris):
+                                self.mode = MODE_ACCUEIL
+                                self.update_souris()
+                                break
+                            sens = -1 if (event.button == 3 or event.button == 5) else 1
+                            if self.mode_logimage in [MODE_LOGIMAGE_CREER, MODE_LOGIMAGE_RENTRE]:
+                                self.logimage.titre.gere_clic(self.x_souris, self.y_souris)
+                            self.logimage.gere_clic_up(self.x_souris, self.y_souris, sens)
+
+                            if sens == 1:
+                                for bouton in self.liste_boutons_logimage:
+                                    if bouton.clic(self.x_souris, self.y_souris):
+                                        self.fait_actions_boutons(bouton)
+                                        break
+                            else:
+                                set_action_test_creation(False)
+
+                elif event.type == pygame.MOUSEBUTTONDOWN:
+                    sens = -1 if (event.button == 3 or event.button == 5) else 1
+                    self.update_souris(sens)
+                    self.mouse_button_down = sens
+                    if self.mode == MODE_LOGIMAGE and (event.button == 4 or event.button == 5):
+                        self.logimage.gere_clic_down(self.x_souris, self.y_souris, sens)
 
         if self.mouse_button_down:
             if self.mode == MODE_LOGIMAGE:
@@ -405,9 +425,13 @@ class Fenetre:
         elif self.mode == MODE_CHOISI_LOGIMAGE:
             affiche_texte(TITRE_MODE_CHOISI_LOGIMAGE, LARGEUR // 2, int(TAILLE_TITRE * 0.2), self.screen,
                           taille=TAILLE_TITRE, couleur=COULEUR_TITRE, x_0gauche_1centre_2droite=1)
-            for vignette in self.liste_vignettes_choisi_logimage:
-                vignette.affiche(self.screen)
-            self.bouton_revenir_accueil.affiche(self.screen)
+            if self.chargement:
+                affiche_texte(TITRE_MODE_CHOISI_LOGIMAGE_CHARGEMENT, LARGEUR // 2, HAUTEUR // 2, self.screen,
+                              taille=int(TAILLE_TITRE * 2), couleur=COULEUR_CHARGEMENT, x_0gauche_1centre_2droite=1)
+            else:
+                for vignette in self.liste_vignettes_choisi_logimage:
+                    vignette.affiche(self.screen)
+                self.bouton_revenir_accueil.affiche(self.screen)
         else:
             if self.mode_correction_logimage:
                 logimage = self.logimage.logimage_correction_progressive

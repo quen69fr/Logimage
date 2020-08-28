@@ -93,6 +93,8 @@ class Bouton:
             set_action_corriger_logimage(not get_action_corriger_logimage())
         elif self.type_action == TYPE_ACTION_POINTEUR:
             set_action_pointeur(not get_action_pointeur())
+        elif self.type_action == TYPE_ACTION_AIDE:
+            set_action_aide(not get_action_aide())
 
     def clic(self, x_souris: int, y_souris: int):
         if self.x < x_souris < self.x + self.largeur and self.y < y_souris < self.y + self.hauteur:
@@ -116,6 +118,7 @@ class Bouton:
                 (self.type_action == TYPE_ACTION_COLORIER_CASE and get_action_colorier_case()) or \
                 (self.type_action == TYPE_ACTION_CRAYON and get_action_logimage_mode_crayon()) or \
                 (self.type_action == TYPE_ACTION_POINTEUR and get_action_pointeur()) or \
+                (self.type_action == TYPE_ACTION_AIDE and get_action_aide()) or \
                 (self.type_action == TYPE_ACTION_CORRIGER_LOGIMAGE and get_action_corriger_logimage()):
             ecran = self.ecran_selectionne
 

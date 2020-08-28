@@ -117,6 +117,8 @@ class Logimage:
             self.dic_points_crayon = {}
             self.liste_cases_rayees = []
             self.taille_point_crayon = 0
+            self.aide = None
+            self.stop_tread_aide = True
         else:
             self.logimage_correction_progressive = None
 
@@ -1023,6 +1025,94 @@ class Logimage:
                                      nb_etapes_ordinateur=self.nb_etapes_ordinateur)
             logimage_impr.imprime_png('', dossier_sauvegarde)
 
+    def trouve_ligne_colonne_aide(self):
+        lignes_colonnes_a_tester = [(True, n) for n in range(self.nb_lignes)] + \
+                                   [(False, n) for n in range(self.nb_colonnes)]
+        random.shuffle(lignes_colonnes_a_tester)
+        for ligne_ou_pas, n in lignes_colonnes_a_tester:
+            if self.stop_tread_aide:
+                return False
+            if ligne_ou_pas:
+                ligne = self.cases[n]
+                if CASE_INCONNUE not in ligne:
+                    continue
+                liste_nbs = self.sequences_lignes[n]
+            else:
+                ligne = [ligne[n] for ligne in self.cases]
+                if CASE_INCONNUE not in ligne:
+                    continue
+                liste_nbs = self.sequences_colonnes[n]
+            if len(trouve_cases_communes_grossierement(ligne, liste_nbs)) > 0:
+                self.aide = (ligne_ou_pas, n)
+                return True
+
+        # for n, ligne in enumerate(self.cases):
+        #     if self.stop_tread_aide:
+        #         return False
+        #     liste_nbs = self.sequences_lignes[n]
+        #     if len(trouve_cases_communes_grossierement(ligne, liste_nbs)) > 0:
+        #         self.aide = (True, n)
+        #         return True
+        #
+        # for n in range(self.nb_colonnes):
+        #     if self.stop_tread_aide:
+        #         return False
+        #     colonne = [ligne[n] for ligne in self.cases]
+        #     liste_nbs = self.sequences_colonnes[n]
+        #     if len(trouve_cases_communes_grossierement(colonne, liste_nbs)) > 0:
+        #         self.aide = (False, n)
+        #         return True
+
+        cases_ordonnees_colonnes = [[ligne[j] for ligne in self.cases] for j in range(self.nb_colonnes)]
+        lignes_colonnes_a_tester = {}
+        for i in range(self.nb_lignes):
+            if CASE_INCONNUE in self.cases[i]:
+                lignes_colonnes_a_tester[(True, i)] = calcul_score_ligne(self.cases[i], self.sequences_lignes[i])
+        for j in range(self.nb_colonnes):
+            if CASE_INCONNUE in cases_ordonnees_colonnes[j]:
+                lignes_colonnes_a_tester[(False, j)] = calcul_score_ligne(cases_ordonnees_colonnes[j],
+                                                                          self.sequences_colonnes[j])
+
+        while len(lignes_colonnes_a_tester) > 0:
+            if self.stop_tread_aide:
+                return False
+            ligne_ou_pas, n = min(lignes_colonnes_a_tester,
+                                  key=lambda key: lignes_colonnes_a_tester[key][0] * COEF_RENTABILITE_METHODE_1
+                                  if (lignes_colonnes_a_tester[key][1] and
+                                      lignes_colonnes_a_tester[key][0] < SEUIL_MAX_METODE_RECURSIVE_SANS_MEMOIRE)
+                                  else lignes_colonnes_a_tester[key][0])
+            nb_possibilites, methode_1_ou_2 = lignes_colonnes_a_tester[(ligne_ou_pas, n)]
+            del lignes_colonnes_a_tester[(ligne_ou_pas, n)]
+            if ligne_ou_pas:
+                ligne = self.cases[n]
+                liste_nbs = self.sequences_lignes[n]
+                if len(trouve_cases_communes_intelligent(ligne, liste_nbs, methode_1_ou_2, nb_possibilites)) > 0:
+                    self.aide = (True, n)
+                    return True
+
+            else:
+                colonne = cases_ordonnees_colonnes[n]
+                liste_nbs = self.sequences_colonnes[n]
+                if len(trouve_cases_communes_intelligent(colonne, liste_nbs,  methode_1_ou_2, nb_possibilites)) > 0:
+                    self.aide = (False, n)
+                    return True
+        return False
+
+    def stop_aide(self):
+        self.stop_tread_aide = True
+        set_action_aide(False)
+
+    def gere_aide(self):
+        if len(self.liste_erreurs) > 0:
+            self.aide = False
+        elif not test_reste_cases_inconnues(self.cases):
+            self.stop_aide()
+        else:
+            self.aide = None
+            self.stop_tread_aide = False
+            thread_aide = Thread(target=self.trouve_ligne_colonne_aide)
+            thread_aide.start()
+
     def return_dict_logimage(self):
         if self.mode_logimage == MODE_LOGIMAGE_CREER:
             corrige = self.cases
@@ -1371,8 +1461,7 @@ class Logimage:
 
     def corrige_erreurs(self):
         if self.trouve_erreurs:
-            liste_erreurs = self.liste_erreurs[:]
-            for ligne, colonne in liste_erreurs:
+            for ligne, colonne in self.liste_erreurs[:]:
                 self.set_case_grille_sans_update_erreurs(ligne, colonne, self.corrige[ligne][colonne])
         self.remet_liste_erreur_a_zero()
 
@@ -1481,6 +1570,9 @@ class Logimage:
             if self.test_souris_sur_ecran(x_souris, y_souris):
                 i, j = self.get_ligne_colonne_souris(x_souris, y_souris)
                 if not (i, j) == self.derniere_case_modifiee:
+                    if get_action_aide() and (not type(self.aide) == tuple or not (self.aide == (True, i) or
+                                                                                   self.aide == (False, j))):
+                        self.stop_aide()
                     self.derniere_case_modifiee = (i, j)
                     if 0 <= i < self.nb_lignes and 0 <= j < self.nb_colonnes:
                         self.gere_clic_down_grille(i, j, sens)
@@ -1716,19 +1808,22 @@ class Logimage:
             self.affiche_case(i, j, couleur, texte)
         self.updating_thread = False
 
+    def affiche_ligne_colonne_actions(self, screen: pygame.Surface, ligne_ou_pas, n):
+        x, y = self.get_pos_case(n, n)
+        d = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+        cote = self.cote_case - self.taille_quadrillage
+        if ligne_ou_pas:
+            affiche_rect_transparent((self.x_ecran + d, self.y_ecran + y, self.largeur_ecran - 2 * d, cote),
+                                     screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+        else:
+            affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote, self.hauteur_ecran - 2 * d),
+                                     screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+
     def affiche_actions(self, screen: pygame.Surface, x_souirs: int, y_souris: int):
         if self.mode_logimage == MODE_LOGIMAGE_CORRECTION:
             if self.ligne_ou_colonne_en_cours is not None:
                 ligne_ou_pas, n = self.ligne_ou_colonne_en_cours
-                x, y = self.get_pos_case(n, n)
-                d = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
-                cote = self.cote_case - self.taille_quadrillage
-                if ligne_ou_pas:
-                    affiche_rect_transparent((self.x_ecran + d, self.y_ecran + y, self.largeur_ecran - 2 * d, cote),
-                                             screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
-                else:
-                    affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote, self.hauteur_ecran - 2 * d),
-                                             screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+                self.affiche_ligne_colonne_actions(screen, ligne_ou_pas, n)
         else:
             action_logimage_ligne_possible_ = get_action_logimage_ligne_possible()
             action_logimage_colonne_possible_ = get_action_logimage_colonne_possible()
@@ -1736,6 +1831,7 @@ class Logimage:
             action_colorier_case_ = get_action_colorier_case()
             action_corriger_logimage_ = get_action_corriger_logimage()
             action_pointeur_ = get_action_pointeur()
+            action_aide_ = get_action_aide()
 
             if action_logimage_ligne_possible_ is not None:
                 if action_logimage_ligne_possible_ == ACTION_ADD_1 or \
@@ -1841,6 +1937,11 @@ class Logimage:
                     cote_case = self.cote_case - self.taille_quadrillage
                     affiche_rect_transparent((self.x_ecran + x, self.y_ecran + y, cote_case, cote_case), screen,
                                              COULEUR_CASES_ERREUR[0], COULEUR_CASES_ERREUR[1])
+                if len(self.liste_erreurs) == 0 and not test_reste_cases_inconnues(self.cases):
+                    affiche_texte(TEXTE_BRAVO, self.x_ecran + self.largeur_ecran // 2 + self.x_origine_sur_ecran // 2,
+                                  self.y_ecran + self.hauteur_ecran // 2 + self.y_origine_sur_ecran // 2, screen,
+                                  taille=TAILLE_TEXTE_ACTION_CENTRE, couleur=COULEUR_SUCCES,
+                                  x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
 
             if self.mode_logimage == MODE_LOGIMAGE_FAIT:
                 for pos, nb in self.dic_points_crayon.items():
@@ -1873,15 +1974,36 @@ class Logimage:
                                              screen, NOIR, 150)
 
             if action_pointeur_:
-                ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
-                if 0 <= ligne < self.nb_lignes and 0 <= colonne < self.nb_colonnes:
-                    x, y = self.get_pos_case(ligne, colonne)
-                    d = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
-                    cote = self.cote_case - self.taille_quadrillage
-                    affiche_rect_transparent((self.x_ecran + d, self.y_ecran + y, self.largeur_ecran - 2 * d, cote),
-                                             screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
-                    affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote, self.hauteur_ecran - 2 * d),
-                                             screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+                if self.test_souris_sur_ecran(x_souirs, y_souris):
+                    ligne, colonne = self.get_ligne_colonne_souris(x_souirs, y_souris)
+                    if ligne >= 0 or colonne >= 0:
+                        x, y = self.get_pos_case(ligne, colonne)
+                        d = self.taille_quadrillage + self.ecart_quadrillage_principal * 2
+                        cote = self.cote_case - self.taille_quadrillage
+                        if 0 <= ligne < self.nb_lignes:
+                            affiche_rect_transparent((self.x_ecran + d, self.y_ecran + y, self.largeur_ecran - 2 * d,
+                                                      cote), screen, COULEUR_POINTEUR[0], COULEUR_POINTEUR[1])
+                        if 0 <= colonne < self.nb_colonnes:
+                            affiche_rect_transparent((self.x_ecran + x, self.y_ecran + d, cote,
+                                                      self.hauteur_ecran - 2 * d), screen, COULEUR_POINTEUR[0],
+                                                     COULEUR_POINTEUR[1])
+
+            if action_aide_:
+                if self.aide is None:
+                    affiche_texte(TEXTE_PATIENTER_AIDE,
+                                  self.x_ecran + self.largeur_ecran // 2 + self.x_origine_sur_ecran // 2,
+                                  self.y_ecran + self.hauteur_ecran // 2 + self.y_origine_sur_ecran // 2, screen,
+                                  taille=int(TAILLE_TEXTE_ACTION_CENTRE * 0.9), couleur=COULEUR_SUCCES,
+                                  x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
+                elif type(self.aide) == tuple:
+                    ligne_ou_pas, n = self.aide
+                    self.affiche_ligne_colonne_actions(screen, ligne_ou_pas, n)
+                else:
+                    affiche_texte(TEXTE_VOIR_ERREUR_AIDE,
+                                  self.x_ecran + self.largeur_ecran // 2 + self.x_origine_sur_ecran // 2,
+                                  self.y_ecran + self.hauteur_ecran // 2 + self.y_origine_sur_ecran // 2, screen,
+                                  taille=int(TAILLE_TEXTE_ACTION_CENTRE * 0.9), couleur=COULEUR_ECHEC,
+                                  x_0gauche_1centre_2droite=1, y_0haut_1centre_2bas=1)
 
     def affiche(self, screen: pygame.Surface):
         self.update_affichage_thread()
