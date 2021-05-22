@@ -62,6 +62,19 @@ def test_reste_cases_inconnues(cases):
     return False
 
 
+def test_cases_inconnues_d_un_seul_bloc(ligne: list):
+    cases_inconnues = 0
+    for case in ligne:
+        if case == CASE_INCONNUE:
+            if cases_inconnues == 0:
+                cases_inconnues = 1
+            elif cases_inconnues == 2:
+                return False
+        elif cases_inconnues == 1:
+            cases_inconnues = 2
+    return True
+
+
 def trouve_degres_et_x(sequence, nb_cases):
     return len(sequence) + 1, nb_cases - sum(sequence) - len(sequence) + 1
 

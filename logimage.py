@@ -15,8 +15,8 @@ PARAM_LOGIMAGE_CORRIGE = "6"
 PARAM_LOGIMAGE_NB_ETAPES_ODRI = "7"
 PARAM_LOGIMAGE_MODE = "8"
 
-PARAM_LOGIMAGE_NOM_SAUVEGARDE = "-1"
-PARAM_LOGIMAGE_CASES = "-2"
+# PARAM_LOGIMAGE_NOM_SAUVEGARDE = "-1"
+# PARAM_LOGIMAGE_CASES = "-2"
 
 
 def create_logimage_sauvegarde(titre_sauvegarde_logimage: str, mode_logimage):
@@ -931,7 +931,9 @@ class Logimage:
                         if not methode_grossiere:
                             erreur_memoire = True
                     else:
+                        un_seul_bloc = False
                         if len(liste_cases_communes) > 0:
+                            un_seul_bloc = test_cases_inconnues_d_un_seul_bloc(ligne)
                             self.nb_etapes_ordinateur += 1
                             for j, valeur in liste_cases_communes:
                                 nb_cases_fixees += 1
@@ -940,10 +942,15 @@ class Logimage:
                                 lignes_colonnes_a_tester[(False, j)] = \
                                     calcul_score_ligne(cases_ordonnees_colonnes[j], self.sequences_colonnes[j])
                                 if (False, j) not in liste_lignes_colonnes_a_tester_grossierement:
-                                    liste_lignes_colonnes_a_tester_grossierement.append([False, j])
+                                    liste_lignes_colonnes_a_tester_grossierement.append((False, j))
+                                # if not un_seul_bloc:
+                                #     un_seul_bloc = test_cases_inconnues_d_un_seul_bloc(ligne)
                             if nb_cases_fixees >= nb_cases_a_fixees:
                                 self.faisable = True
                                 break
+                        if methode_grossiere and (True, n) in lignes_colonnes_a_tester and \
+                                (un_seul_bloc or test_cases_inconnues_d_un_seul_bloc(ligne)):
+                            del lignes_colonnes_a_tester[(True, n)]
 
                 else:
                     colonne = cases_ordonnees_colonnes[n]
@@ -980,7 +987,9 @@ class Logimage:
                         if not methode_grossiere:
                             erreur_memoire = True
                     else:
+                        un_seul_bloc = False
                         if len(liste_cases_communes) > 0:
+                            un_seul_bloc = test_cases_inconnues_d_un_seul_bloc(colonne)
                             self.nb_etapes_ordinateur += 1
                             for i, valeur in liste_cases_communes:
                                 nb_cases_fixees += 1
@@ -990,9 +999,14 @@ class Logimage:
                                     calcul_score_ligne(cases[i], self.sequences_lignes[i])
                                 if (True, i) not in liste_lignes_colonnes_a_tester_grossierement:
                                     liste_lignes_colonnes_a_tester_grossierement.append((True, i))
+                                # if not un_seul_bloc:
+                                #     un_seul_bloc = test_cases_inconnues_d_un_seul_bloc(colonne)
                             if nb_cases_fixees >= nb_cases_a_fixees:
                                 self.faisable = True
                                 break
+                        if methode_grossiere and (False, n) in lignes_colonnes_a_tester and \
+                                (un_seul_bloc or test_cases_inconnues_d_un_seul_bloc(colonne)):
+                            del lignes_colonnes_a_tester[(False, n)]
 
         dossier_sauvegarde = None
         if self.possible:
@@ -1093,7 +1107,7 @@ class Logimage:
             else:
                 colonne = cases_ordonnees_colonnes[n]
                 liste_nbs = self.sequences_colonnes[n]
-                if len(trouve_cases_communes_intelligent(colonne, liste_nbs,  methode_1_ou_2, nb_possibilites)) > 0:
+                if len(trouve_cases_communes_intelligent(colonne, liste_nbs, methode_1_ou_2, nb_possibilites)) > 0:
                     self.aide = (False, n)
                     return True
         return False
@@ -1136,6 +1150,7 @@ class Logimage:
         }
 
     def sauvegarde_logimage(self, dossier_sauvegarde=NOM_DOSSIER_SAUVEGARDE):
+        # self.titre.update_titre_sauvegarde()
         titre = NOM_FICHIER_SAUVEGARDE if self.mode_logimage == MODE_LOGIMAGE_FAIT else self.titre.titre_sauvegarde
         with open(dossier_sauvegarde + titre, 'w') as sauvegarde_logimage:
             json.dump(self.return_dict_logimage(), sauvegarde_logimage)

@@ -131,13 +131,14 @@ class Vignette:
         self.x, self.y, self.largeur, self.hauteur = rect
         self.ecran = ecran
 
-    def clic(self, x_souris: int, y_souris: int):
-        if self.x < x_souris < self.x + self.largeur and self.y < y_souris < self.y + self.hauteur:
+    def clic(self, x_souris: int, y_souris: int, y_vignettes: int):
+        if self.x < x_souris < self.x + self.largeur and \
+                self.y - y_vignettes < y_souris < self.y - y_vignettes + self.hauteur:
             return True
         return False
 
-    def affiche(self, screen: pygame.Surface):
-        affiche_surface(self.ecran, self.x, self.y, screen, largeur=self.largeur, hauteur=self.hauteur)
+    def affiche(self, screen: pygame.Surface, y_vignettes: int):
+        affiche_surface(self.ecran, self.x, self.y - y_vignettes, screen, largeur=self.largeur, hauteur=self.hauteur)
 
 
 class VignetteCategorie(Vignette):
