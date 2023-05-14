@@ -23,14 +23,17 @@ def create_logimage_sauvegarde(titre_sauvegarde_logimage: str, mode_logimage):
     with open(NOM_DOSSIER_SAUVEGARDE + titre_sauvegarde_logimage, "r") as sauvegarde_logimage:
         dict_logimage = json.load(sauvegarde_logimage)
         dernier_cases_sans_erreurs = None
+        annotations = None
         if mode_logimage == MODE_LOGIMAGE_CREER:
             cases = dict_logimage[PARAM_LOGIMAGE_CORRIGE]
             correction = None
         elif mode_logimage == MODE_LOGIMAGE_FAIT and dict_logimage[PARAM_LOGIMAGE_MODE] == MODE_LOGIMAGE_FAIT:
             cases = dict_logimage[PARAM_LOGIMAGE_CORRIGE][0]
             correction = dict_logimage[PARAM_LOGIMAGE_CORRIGE][1]
-            if len(dict_logimage[PARAM_LOGIMAGE_CORRIGE]) == 3:
-                dernier_cases_sans_erreurs = dict_logimage[PARAM_LOGIMAGE_CORRIGE][2]
+            annotations = ([(p[0], p[1]) for p in dict_logimage[PARAM_LOGIMAGE_CORRIGE][2][0]],
+                           {(li[0], li[1]): li[2] for li in dict_logimage[PARAM_LOGIMAGE_CORRIGE][2][1]})
+            if len(dict_logimage[PARAM_LOGIMAGE_CORRIGE]) == 4:
+                dernier_cases_sans_erreurs = dict_logimage[PARAM_LOGIMAGE_CORRIGE][3]
         else:
             cases = [[CASE_INCONNUE for _ in range(dict_logimage[PARAM_LOGIMAGE_DIMENTIONS][0])]
                      for _ in range(dict_logimage[PARAM_LOGIMAGE_DIMENTIONS][1])]
@@ -39,7 +42,7 @@ def create_logimage_sauvegarde(titre_sauvegarde_logimage: str, mode_logimage):
         return Logimage(cases, dict_logimage[PARAM_LOGIMAGE_SEQUENCES_LIGNES],
                         dict_logimage[PARAM_LOGIMAGE_SEQUENCES_COLONNES],
                         mode_logimage, None, dict_logimage[PARAM_LOGIMAGE_NOM], titre_sauvegarde_logimage, correction,
-                        dict_logimage[PARAM_LOGIMAGE_NB_ETAPES_ODRI], dernier_cases_sans_erreurs)
+                        dict_logimage[PARAM_LOGIMAGE_NB_ETAPES_ODRI], dernier_cases_sans_erreurs, annotations)
 
 
 def impr_logimage_sauvegarde(titre_sauvegarde_logimage: str):
@@ -89,7 +92,7 @@ def create_logimage_creer_png(chemin_image: str):
 class Logimage:
     def __init__(self, cases: list, sequences_lignes: list, sequences_colonnes: list, mode_logimage,
                  cote_case: int or None, titre: str or None, titre_sauvegarde: str = None, corrige: list = None,
-                 nb_etapes_ordinateur: int = None, dernier_cases_sans_erreurs: list = None):
+                 nb_etapes_ordinateur: int = None, dernier_cases_sans_erreurs: list = None, annotations: tuple = None):
         self.mode_logimage = mode_logimage
 
         self.cases = cases
@@ -117,6 +120,8 @@ class Logimage:
             self.dic_points_crayon = {}
             self.liste_cases_rayees = []
             self.taille_point_crayon = 0
+            if annotations is not None:
+                self.liste_cases_rayees, self.dic_points_crayon = annotations
             self.aide = None
             self.stop_tread_aide = True
         else:
@@ -1131,10 +1136,12 @@ class Logimage:
         if self.mode_logimage == MODE_LOGIMAGE_CREER:
             corrige = self.cases
         elif self.mode_logimage == MODE_LOGIMAGE_FAIT and self.trouve_erreurs:
+            annotations = [[[i, j] for i, j in self.liste_cases_rayees],
+                           [[i, j, k] for (i, j), k in self.dic_points_crayon.items()]]
             if len(self.liste_erreurs) == 0:
-                corrige = [self.cases, self.corrige]
+                corrige = [self.cases, self.corrige, annotations]
             else:
-                corrige = [self.cases, self.corrige, self.dernier_cases_sans_erreurs]
+                corrige = [self.cases, self.corrige, annotations, self.dernier_cases_sans_erreurs]
         else:
             corrige = self.corrige
         return {
